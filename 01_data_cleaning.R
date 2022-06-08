@@ -10,6 +10,8 @@ pacman::p_load(arsenal)
 
 
 # Risk factor -------------------------------------------------------------
+risk_factor_processing_fn <- function() {
+  
 risk_factor_raw <-
   here('data',
        'input',
@@ -93,15 +95,18 @@ risk_factor_raw <- read_xlsx(risk_factor_raw)
     )
 )
 
+return(risk_factor_processed)
+}
 
+risk_factor_working_data <- risk_factor_processing_fn()
 
 # Skin exam ---------------------------------------------------------------
-
+skin_exam_processing_fn <- function() {
+  
 skin_exam_raw <-
   here('data', 'input', 'Tafea_skin exam form_FOR STATA.xlsx')
 skin_exam_raw <- read_xlsx(skin_exam_raw)
 
-(
   skin_exam_processed <- skin_exam_raw %>%
     mutate(
       sex_fct = factor(sex, levels = c('Male', 'Female')),
@@ -139,17 +144,25 @@ skin_exam_raw <- read_xlsx(skin_exam_raw)
       yaws_dpp_result_fct = factor(yaws_dpp_result,
                                    levels = dpp_result_levels,
                                    labels = dpp_result_labels)
-    )
-)
+    ) %>% clean_data()
+
+ 
+return(skin_exam_processed)
+}
 
 
-
+skin_exam_working_data <- skin_exam_processing_fn()
 
 # DBS ---------------------------------------------------------------------
+
+dbs_processing_fn <- function() {
 dbs_raw <-
   here('data', 'input', 'Tafea_DBS sample IDs_FOR STATA.xlsx')
-dbs_raw <- read_xlsx(dbs_raw)
+dbs_raw <- read_xlsx(dbs_raw) %>% clean_data()
+return(dbs_raw)
+}
 
+dbs_working_data <- dbs_processing_fn()
 
 # Form 2 ------------------------------------------------------------------
 
@@ -309,20 +322,21 @@ form2_compare <- summary(comparedf(form2_1_processed_upd %>%
 
 form2_differences_list <- form2_compare$diffs.table
 form2_differences_summary <- form2_compare$comparison.summary.table
-return(form2_working_data)
+return(form2_1_processed_upd)
 }
 
 form2_working_data <- form2_processing_fn()
 # Form 3 ------------------------------------------------------------------
 
+form3_processing_fn <- function(){
 form3_1_raw <-
   here('data',
        'input',
        'Tafea_form 3_data entry person 1_FOR STATA.xlsx')
 form3_1_raw <- read_xlsx(form3_1_raw)
 
-(
-  form3_1_processed <- form3_1_raw %>%
+
+form3_1_processed <- form3_1_raw %>%
     mutate(
       f3_1_sex_fct = factor(
         f3_1_sex,
@@ -339,8 +353,8 @@ form3_1_raw <- read_xlsx(form3_1_raw)
         .names = "{.col}_fct"
       )
     ) %>% remove_empty('rows') %>% 
-    filter(!is.na(mda_code) & !is.na(f3_1_participant_name))
-)
+    filter(!is.na(mda_code) & !is.na(f3_1_participant_name)) %>% 
+  clean_data()
 
 names(form3_1_processed) <- str_replace(names(form3_1_processed), '_1_', '_')
 names(form3_1_processed)
@@ -370,62 +384,26 @@ form3_2_raw <- read_xlsx(form3_2_raw)
       )
     ) %>% remove_empty('rows') %>% 
     filter(!is.na(mda_code) & !is.na(f3_2_participant_name))
-)
+) %>% clean_data()
 
 names(form3_2_processed) <- str_replace(names(form3_2_processed), '_2_', '_')
 names(form3_2_processed)
 
+return(form3_1_processed)
+}
 
-cmp_form3 <- (comparedf(form3_1_processed, form3_2_processed, by=c('mda_code','f3_participant_name')))
-
-form3_compare <- summary(comparedf(form3_1_processed, form3_2_processed, by=c('mda_code','f3_participant_name')))
-
-form3_differences_list <- form3_compare$diffs.table
-form3_differences_summary <- form3_compare$comparison.summary.table
-
-library(openxlsx)
-
-pacman::p_load("xlsx")
-
-write.csv(form2_differences_list, here('data', 'form2_differences_220607.csv'), row.names=FALSE)
-write.csv(form3_differences_list, here('data', 'form3_differences_220607.csv'), row.names=FALSE)
-
-write.xlsx(form2_differences_list %>% as_tibble(), 
-           file = here('data', 'Comparing_survey_data_entry_220607.xlsx'), 
-           sheetName = "form2_differences",
-           rowNames = TRUE)
-
-library(writexl)
-
-list_of_dfs <- list(form2_differences_summary, form3_differences_summary,
-                    form2_differences_list)
-write_xlsx(list_of_dfs, "out.xlsx")
-
-
-dataset_names <- list('form2_summary' = form2_differences_summary, 
-                      'form3_summary' = form3_differences_summary, 
-                      'form2_differences' = form2_differences_list,
-                      'form3_differences' = form3_differences_list)
-write.xlsx(dataset_names, file = here('data', 'Comparing_survey_data_entry_220607.xlsx'))
-
-writexl::write_xlsx(list(form2_summary = form2_differences_summary,
-                         form3_summary = form3_differences_summary,
-                         form2_differences = form2_differences_list %>% as_tibble(),
-                         form3_differences = form3_differences_list), 
-                    here('data', 'Comparing_survey_data_entry_220607.xlsx'))
-
-
+form3_working_data <- form3_processing_fn()
 
 
 
 # Form 3.1 ----------------------------------------------------------------
 
+form3.1_processing_fn<- function(){
+  
 form3.1_raw <- here('data', 'input', 'Tafea_form 3.1_FOR STATA.xlsx')
 form3.1_raw <- read_xlsx(form3.1_raw)
 
-
-(
-  form3.1_processed <- form3.1_raw %>%
+form3.1_processed <- form3.1_raw %>%
     mutate(
       f31_area_council_fct = factor(f31_area_council, levels = area_council_names),
       f31_village_fct = factor(f31_village, levels = c(village_names)),
@@ -436,63 +414,91 @@ form3.1_raw <- read_xlsx(form3.1_raw)
         labels = c('No', "Yes"),
         .names = "{.col}_fct"
       )
-    )
-)
+    ) %>% clean_data()
+return(form3.1_processed)
+}
 
-
+form3.1_working_data <- form3.1_processing_fn() 
 
 
 # Form 10 -----------------------------------------------------------------
 
+form10_processing_fn <- function() {
 form10_raw <- here('data', 'input', 'Tafea_form 10_FOR STATA.xlsx')
 form10_raw <- read_xlsx(form10_raw)
 
 
-(
   form10_processed <- form10_raw %>%
     mutate(
       f10_area_council_fct = factor(f10_area_council, levels = area_council_names),
       f10_village_fct = factor(f10_village, levels = c(village_names)),
       across(
-        ethanol_f10_vars,
+        f10_ethanol,
         factor,
         levels = c('N', 'Y'),
         labels = c('No', "Yes"),
         .names = "{.col}_fct"
       )
-    )
-)
+    ) %>% clean_data()
 
+return(form10_processed)
+}
+
+form10_working_data <- form10_processing_fn()
 
 
 # Form 11 -----------------------------------------------------------------
 
+form11_processing_fn <- function() {
 form11_raw <- here('data', 'input', 'Tafea_form 11_FOR STATA.xlsx')
 form11_raw <- read_xlsx(form11_raw)
 
-(
+
   form11_processed <- form11_raw %>%
     mutate(
       f11_area_council_fct = factor(f11_area_council, levels = area_council_names),
       f11_village_fct = factor(f11_village, levels = c(village_names))
-    )
-)
+    ) %>% clean_data()
 
+return(form11_processed)
+}
 
+form11_working_data <- form11_processing_fn()
 # Stool sample list -------------------------------------------------------
-
-tool_list_raw <-
+stool_sample_processing_fn <- function() {
+stool_list_raw <-
   here('data',
        'input',
        'Tafea_Stool samples sent to Melbourne_FOR STATA.xlsx')
-tool_list_raw <- read_xlsx(tool_list_raw)
+stool_list_raw <- read_xlsx(stool_list_raw)
 
-tool_list_processed <- tool_list_raw
+stool_list_processed <- stool_list_raw
 
+return(stool_list_processed)
+}
 
+stool_sample_working_data <- stool_sample_processing_fn()
 
 # Data checking -----------------------------------------------------------
 
+# Data merging ------------------------------------------------------------
+
+merged_data_all <- form2_working_data %>% 
+  left_join(form3_working_data, by=c('mda_code',
+                                    'f2_participant_name' = 'f3_participant_name')) %>%
+  left_join(form3.1_working_data, by=c('mda_code')) %>%
+  left_join(skin_exam_working_data, by=c('mda_code', 
+                                          'f2_participant_name' = 'participant_name')) %>% 
+  left_join(dbs_working_data, by=c('mda_code')) %>% 
+  left_join(form10_working_data, by=c('mda_code')) %>% 
+  left_join(form11_working_data, by=c('mda_code'))
+
+
+# Need to add skin snips and sth results
+
+
+merged_data_name <- form2_working_data %>% 
+  inner_join(skin_exam_working_data, by=c('f2_participant_name' = 'participant_name'))
 
 library(skimr)
 skim(form11_processed)
