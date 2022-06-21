@@ -10,6 +10,7 @@ pacman::p_load(arsenal)
 
 
 # Risk factor -------------------------------------------------------------
+
 risk_factor_processing_fn <- function() {
   
 risk_factor_raw <-
@@ -24,8 +25,8 @@ risk_factor_raw <- read_xlsx(risk_factor_raw)
     mutate(
       sex_fct = factor(sex, levels = c('Male', 'Female')),
       province_fct = factor(province, levels = province_names),
-      area_council_fct = factor(area_council, levels = area_council_names),
-      village_fct = factor(village, levels = c(village_names)),
+      area_council_fct = factor(str_trim(area_council), levels = area_council_names),
+      village_fct = factor(str_trim(tolower(village)), levels = c(village_names)),
       across(
         yes_no_factor_names,
         factor,
@@ -101,22 +102,26 @@ return(risk_factor_processed)
 risk_factor_working_data <- risk_factor_processing_fn()
 
 # Skin exam ---------------------------------------------------------------
+
 skin_exam_processing_fn <- function() {
   
 skin_exam_raw <-
   here('data', 'input', 'Tafea_skin exam form_FOR STATA.xlsx')
 skin_exam_raw <- read_xlsx(skin_exam_raw)
 
+skin_exam_update_name_mda_code <- readRDS(here('data', 'robjects', 'skin_exam_update_name_mda_code.Rds'))
+
   skin_exam_processed <- skin_exam_raw %>%
     mutate(
-      sex_fct = factor(sex, levels = c('Male', 'Female')),
+      sex_fct = factor(sex, levels = c('M', 'F'), 
+                       labels=c('male', 'female')),
       province_fct = factor(province, levels = province_names),
-      area_council_fct = factor(area_council, levels = area_council_names),
-      village_fct = factor(village, levels = c(village_names)),
+      area_council_fct = factor(tolower(area_council), levels = area_council_names),
+      village_fct = factor(tolower(str_trim(village)), levels = c(village_names)),
       across(
         skin_varlist,
         factor,
-        levels = c('No', 'Yes'),
+        levels = c('Yes', 'No'),
         .names = "{.col}_fct"
       ),
       across(
@@ -136,44 +141,149 @@ skin_exam_raw <- read_xlsx(skin_exam_raw)
                    'No'),
         labels = c('Yes', 'No')
       ),
-      yaws_previous_treatment_drug_fct = factor(yaws_previous_treatment_drug,
-                                                levels = drug_fct_levels),
       yaws_ulcer_location_fct = factor(yaws_ulcer_location,
                                        levels = ulcer_location_levels,
                                        labels = ulcer_location_labels),
       yaws_dpp_result_fct = factor(yaws_dpp_result,
                                    levels = dpp_result_levels,
                                    labels = dpp_result_labels)
-    ) %>% clean_data()
+    ) %>% 
+    clean_data() %>% 
+    left_join(skin_exam_update_name_mda_code, by=c('participant_name', 'village', 'sex', 'age'))  %>%
+    mutate(participant_name = case_when(!is.na(participant_name_upd) ~ participant_name_upd,
+                                        TRUE ~ participant_name)) %>%
+    mutate(mda_code = case_when(!is.na(mda_code_upd) ~ mda_code_upd,
+                                      TRUE ~ mda_code)) %>%
+    select(-c(participant_name_upd, mda_code_upd)) %>%
+    mutate(mda_code=case_when(mda_code=='9_003_07_139' ~ '9_003_07_13',
+                              TRUE ~ mda_code)) %>% 
+    select(-c(sex, province, area_council,village, skin_varlist, skin_checklist, yaws_first_ulcer)) %>% 
+    mutate(flag=1) %>%
+    dplyr::rename_with(~ paste0("skin_exam_", .), -c(mda_code)) %>% 
+    ###############SCABIES
+    mutate(across(c(skin_exam_scabies_typical_lesions_fct,
+                    skin_exam_scabies_lesions_more_10_fct, 
+                    skin_exam_scabies_skin_infection_fct),~ case_when(skin_exam_scabies_scratching_24_fct=='no' ~ 'no lesion detected',
+                                                                      .=='no' ~ 'no',
+                                                                      .=='yes' ~ 'yes'))) %>% 
+    mutate(across(c(skin_exam_scabies_typical_lesions_fct,
+                    skin_exam_scabies_lesions_more_10_fct, 
+                    skin_exam_scabies_skin_infection_fct), ~ factor(., levels=c('yes', 'no', 'no lesion detected')))) %>% 
+    
+    #############YAWS
+    mutate(skin_exam_yaws_saw_lesion_fct = case_when(skin_exam_yaws_self_report_fct=='yes' ~ 'yaws lesion self-reported',
+                                                     skin_exam_yaws_saw_lesion_fct=='yes' ~ 'yes', 
+                                                     skin_exam_yaws_suspected_fct=='yes' ~ 'yes',
+                                                     skin_exam_yaws_saw_lesion_fct=='no' ~ 'no')) %>% 
+    mutate(skin_exam_yaws_saw_lesion_fct=factor(skin_exam_yaws_saw_lesion_fct, levels=c('yes', 'no', 'yaws lesion self-reported'))) %>% 
+    mutate(across(c(skin_exam_yaws_suspected_fct,
+                    skin_exam_yaws_previous_treatment_fct,
+                    #skin_exam_yaws_village_arrive_6m_fct,
+                    #skin_exam_yaws_village_travel_6m_fct,
+                    skin_exam_yaws_dpp_line1_fct,
+                    skin_exam_yaws_dpp_line2_fct,
+                    skin_exam_yaws_dpp_linec_fct,
+                    skin_exam_yaws_swab_collected_fct,
+                    skin_exam_yaws_first_ulcer_fct),~ case_when(skin_exam_yaws_self_report_fct=='no' & 
+                                                                  skin_exam_yaws_saw_lesion_fct =='no' ~ 'no yaws lesion detected',
+                                                                .=='no' ~ 'no',
+                                                                .=='yes' ~ 'yes'))) %>% 
+    mutate(across(c(skin_exam_yaws_suspected_fct,
+                    skin_exam_yaws_previous_treatment_fct,
+                   # skin_exam_yaws_village_arrive_6m_fct,
+                    #skin_exam_yaws_village_travel_6m_fct,
+                    skin_exam_yaws_dpp_line1_fct,
+                    skin_exam_yaws_dpp_line2_fct,
+                    skin_exam_yaws_dpp_linec_fct,
+                    skin_exam_yaws_swab_collected_fct,
+                    skin_exam_yaws_first_ulcer_fct), ~ factor(., levels=c('yes', 'no', 'no yaws lesion detected')))) %>% 
+    mutate(skin_exam_yaws_dpp_result_fct=case_when(skin_exam_yaws_self_report_fct=='no' & 
+                                                     skin_exam_yaws_saw_lesion_fct =='no' ~ 'no yaws lesion detected',
+                                                   skin_exam_yaws_dpp_result_fct=='positive_active_yaws' ~ 'positive_active_yaws',
+                                                   skin_exam_yaws_dpp_result_fct=='old_treated_yaws' ~ 'old_treated_yaws',
+                                                   skin_exam_yaws_dpp_result_fct=='negative_no_yaws' ~ 'negative_no_yaws',
+                                                   skin_exam_yaws_dpp_result_fct=='false_positive' ~ 'false_positive')) %>% 
+    mutate(skin_exam_yaws_dpp_result_fct=factor(skin_exam_yaws_dpp_result_fct, levels=c('positive_active_yaws',
+                                                                                        'old_treated_yaws', 
+                                                                                        'negative_no_yaws', 
+                                                                                        'false_positive', 
+                                                                                        'no yaws lesion detected'))) %>% 
+    mutate(skin_exam_yaws_ulcer_location_fct = factor(if_else((skin_exam_yaws_self_report_fct=='no' & 
+                                                                 skin_exam_yaws_saw_lesion_fct =='no'),
+                                                              'no yaws lesion detected', 
+                                                              as.character(skin_exam_yaws_ulcer_location_fct)))) %>% 
+    mutate(skin_exam_leprosy_saw_lesion_fct = case_when(skin_exam_leprosy_self_report_fct=='yes' ~ 'leprosy lesion self-reported',
+                                                        skin_exam_leprosy_saw_lesion_fct=='yes' ~ 'yes', 
+                                                        skin_exam_leprosy_suspected_fct=='yes' ~ 'yes',
+                                                        skin_exam_leprosy_saw_lesion_fct=='no' ~ 'no')) %>% 
+    mutate(skin_exam_leprosy_saw_lesion_fct=factor(skin_exam_leprosy_saw_lesion_fct, levels=c('yes', 'no', 'leprosy lesion self-reported'))) %>% 
+    mutate(skin_exam_leprosy_suspected_fct=factor(if_else((skin_exam_leprosy_self_report_fct=='no' & 
+                                                             skin_exam_leprosy_saw_lesion_fct =='no'),
+                                                          'no leprosy lesion detected', 
+                                                          as.character(skin_exam_leprosy_suspected_fct)))) %>% 
+    mutate(skin_exam_leprosy_suspected_fct=factor(skin_exam_leprosy_suspected_fct, levels=c('yes', 'no', 'no leprosy lesion detected'))) %>% 
+    mutate(across(c(skin_exam_ssd_none_fct,
+                    skin_exam_ssd_abscess_boil_fct,
+                    skin_exam_ssd_cellulitis_fct ,
+                    skin_exam_ssd_crusted_scabies,
+                    skin_exam_ssd_other), factor, levels=c('checked', 'unchecked'))) %>% 
+    mutate(skin_exam_ssd_other_specify=factor(if_else(skin_exam_ssd_other=='unchecked', 'no other skin disease suspected', 
+                                                      as.character(skin_exam_ssd_other_specify)), 
+                                              levels=c('rash', 'ringworm', 'no other skin disease suspected')))
+  
 
  
 return(skin_exam_processed)
 }
 
-
-skin_exam_working_data <- skin_exam_processing_fn()
+skin_exam_working_data <- skin_exam_processing_fn() 
 
 # DBS ---------------------------------------------------------------------
 
 dbs_processing_fn <- function() {
 dbs_raw <-
   here('data', 'input', 'Tafea_DBS sample IDs_FOR STATA.xlsx')
-dbs_raw <- read_xlsx(dbs_raw) %>% clean_data()
-return(dbs_raw)
+dbs_raw <- read_xlsx(dbs_raw)
+dbs_processed <- dbs_raw  %>% clean_data()
+return(dbs_processed)
 }
 
 dbs_working_data <- dbs_processing_fn()
 
+# Skin swab ---------------------------------------------------------------
+
+skin_swab_processing_fn <- function() {
+  
+skin_swab_raw <-
+  here('data', 'input', 'sore swab DBS samples.xlsx')
+skin_swab_raw <- read_xlsx(skin_swab_raw, sheet='Sore swap reshaped') 
+
+skin_swab_processed <- skin_swab_raw %>% clean_data()
+
+return(skin_swab_processed)
+}
+
+skin_swab_working_data <- skin_swab_processing_fn()
+
 # Form 2 ------------------------------------------------------------------
 
+age_groups <-
+  c(paste(seq(0, 20, by = 20), seq(0 + 20 - 1, 40 - 1, by = 20),
+          sep = "-"), paste(40, "+", sep = ""))
+
+age_group_fn <- function(x) {
+  cut(x,breaks = c(seq(0, 40, by = 20), Inf),labels = age_groups, right = FALSE)
+}
+
+
 form2_processing_fn <- function() {
+  
 form2_1_raw <-
   here('data',
        'input',
        'Tafea_form 2_data entry person 1_FOR STATA.xlsx')
 form2_1_raw <- read_xlsx(form2_1_raw)
 
-(
   form2_1_processed <- form2_1_raw %>%
     mutate(
       f2_1_sex_fct = factor(
@@ -181,13 +291,19 @@ form2_1_raw <- read_xlsx(form2_1_raw)
         levels = c('M', 'F'),
         labels = c("Male", "Female")
       ),
-      f2_1_area_council_fct = factor(f2_1_area_council, levels = area_council_names),
-      f2_1_village_fct = factor(f2_1_village, levels = c(village_names)),
+      f2_1_area_council_fct = factor(tolower(f2_1_area_council), levels = c('aneityum', 
+                                                                            'south west tanna', 
+                                                                            'whitesands', 
+                                                                            'south tanna', 
+                                                                            'middle bush', 
+                                                                            'futuna', 
+                                                                            'west tanna')),
+      f2_1_village_fct = factor(tolower(f2_1_village), levels = c(village_names)),
       across(
         form2_1_yesno,
         factor,
-        levels = c('N', 'Y'),
-        labels = c('No', "Yes"),
+        levels = c('Y', 'N'),
+        labels = c('Yes', "No"),
         .names = "{.col}_fct"
       ),
       data_entry_person=1
@@ -197,8 +313,6 @@ form2_1_raw <- read_xlsx(form2_1_raw)
     clean_data() %>% 
     remove_empty('rows') %>% 
     filter(!is.na(mda_code) & !is.na(f2_1_participant_name))
-)
-  
 
 names(form2_1_processed) <- str_replace(names(form2_1_processed), '_1_', '_')
 names(form2_1_processed)
@@ -220,13 +334,19 @@ name_update <- readRDS(here('data', 'robjects', 'name_updates.Rds')) %>%
         levels = c('M', 'F'),
         labels = c("Male", "Female")
       ),
-      f2_2_area_council_fct = factor(f2_2_area_council, levels = area_council_names),
-      f2_2_village_fct = factor(f2_2_village, levels = c(village_names)),
+      f2_2_area_council_fct = factor(tolower(f2_2_area_council), levels = c('aneityum', 
+                                                                            'south west tanna', 
+                                                                            'whitesands', 
+                                                                            'south tanna', 
+                                                                            'middle bush', 
+                                                                            'futuna', 
+                                                                            'west tanna')),
+      f2_2_village_fct = factor(tolower(f2_2_village), levels = c(village_names)),
       across(
         form2_2_yesno,
         factor,
-        levels = c('N', 'Y'),
-        labels = c('No', "Yes"),
+        levels = c('Y', 'N'),
+        labels = c('Yes', "No"),
         .names = "{.col}_fct"
       ),
       data_entry_person=2
@@ -252,11 +372,50 @@ names(form2_2_processed) <- str_replace(names(form2_2_processed), '_2_', '_')
 
 # Where data is missing, replace with non-missing values
 
-form2_combine_fill <- form2_1_processed %>% mutate(data_entry=1) %>% 
+form2_combine_fill <- form2_1_processed %>% 
+  mutate(data_entry=1) %>% 
   bind_rows(form2_2_processed %>% mutate(data_entry=2)) %>% 
   group_by(mda_code,f2_participant_name) %>% 
   arrange(mda_code, f2_participant_name) %>% 
-  fill(everything(), .direction = "downup")
+  fill(everything(), .direction = "downup") %>% 
+  mutate(f2_flag=1) %>% 
+  mutate(across(c(f2_stool_container_fct,
+                  f2_questionnaire_fct,
+                  f2_stool_sample_fct,
+                  f2_leprosy_suspected_fct,
+                  f2_yaws_suspected_fct,
+                  f2_ssd_suspected_fct), ~ factor(case_when(f2_consent_fct=='no' ~ 'consent not obtained',
+                                                            TRUE ~ as.character(.)), 
+                                                  levels=c('yes', 'no', 'consent not obtained')))) %>% 
+  mutate(f2_age_group = age_group_fn(f2_age)) %>% 
+  # mutate(f2_sex_fct=case_when(!is.na(f2_sex_fct) ~ 'Sex missing', 
+  #                             TRUE ~ f2_sex_fct)) %>% 
+  #mutate(f2_sex_fct=fct_explicit_na(f2_sex_fct, 'Sex missing')) %>% 
+  #mutate(f2_age_group=fct_explicit_na(f2_age_group, 'Age missing')) %>% 
+  mutate(f2_azith_any_fct = case_when(f2_azith_1tab_fct == 'yes' ~ 'yes',
+                                      f2_azith_2tab_fct == 'yes' ~ 'yes', 
+                                      f2_azith_3tab_fct == 'yes' ~ 'yes')) %>% 
+  mutate(f2_azith_any_fct = case_when((is.na(f2_azith_any_fct) & f2_flag==1) ~ 'no', 
+                                      TRUE ~ f2_azith_any_fct)) %>% 
+  mutate(f2_alb_any_fct = case_when(f2_alb_0_5tab_fct == 'yes' ~ 'yes',
+                                    f2_alb_sac_1tab_fct == 'yes' ~ 'yes', 
+                                    f2_alb_wcba_1tab_fct == 'yes' ~ 'yes')) %>% 
+  mutate(f2_alb_any_fct = case_when((is.na(f2_alb_any_fct) & f2_flag==1) ~ 'no', 
+                                    TRUE ~ f2_alb_any_fct)) %>% 
+  mutate(f2_ivm_any_fct = case_when(f2_ivm_1tab_fct == 'yes' ~ 'yes',
+                                    f2_ivm_2tab_fct == 'yes' ~ 'yes', 
+                                    f2_ivm_3tab_fct == 'yes' ~ 'yes',
+                                    f2_ivm_4tab_fct == 'yes' ~ 'yes')) %>% 
+  mutate(f2_ivm_any_fct = case_when((is.na(f2_ivm_any_fct) & f2_flag==1) ~ 'no', 
+                                    TRUE ~ f2_ivm_any_fct)) %>% 
+  mutate(across(f2_azith_any_fct:f2_ivm_any_fct, factor, levels=c('yes', 'no'))) %>% 
+  mutate(f2_pm_any_fct = case_when(f2_pm_2m_fct == 'yes' ~ 'yes',
+                                   f2_pm_2m_12yr_fct == 'yes' ~ 'yes',
+                                   f2_pm_other_fct == 'yes' ~ 'yes')) %>% 
+  mutate(f2_pm_any_fct = case_when(f2_ivm_any_fct=='yes' ~ 'no-received ivermectin',
+                                   is.na(f2_pm_any_fct) & (f2_flag==1 & f2_ivm_any_fct=='no') ~ 'no',
+                                   TRUE ~ f2_pm_any_fct)) %>% 
+  mutate(f2_pm_any_fct=factor(f2_pm_any_fct, levels=c('yes', 'no-received ivermectin', 'no')))
 
 correct_names_fn <- function() {
   name_cleaning <- form2_combine_fill %>% 
@@ -285,10 +444,10 @@ correct_names_fn <- function() {
     mutate(f2_participant_name_upd=coalesce(data_entry1, data_entry2)) %>% 
     select(mda_code=mda_code.x, f2_participant_name_upd)
   
-  saveRDS(name_cleaning_fuzzy, here('data', 'robjects', 'name_updates.Rds'))
+  #saveRDS(name_cleaning_fuzzy, here('data', 'robjects', 'name_updates.Rds'))
 }
 
-coorect_mda_fn <- function() {
+correct_mda_fn <- function() {
 mda_cleaning <- form2_combine_fill %>% 
      ungroup() %>% 
      count(mda_code) %>% 
@@ -322,10 +481,12 @@ form2_compare <- summary(comparedf(form2_1_processed_upd %>%
 
 form2_differences_list <- form2_compare$diffs.table
 form2_differences_summary <- form2_compare$comparison.summary.table
+
 return(form2_1_processed_upd)
 }
 
-form2_working_data <- form2_processing_fn()
+form2_working_data <- form2_processing_fn() %>% ungroup()
+
 # Form 3 ------------------------------------------------------------------
 
 form3_processing_fn <- function(){
@@ -392,9 +553,7 @@ names(form3_2_processed)
 return(form3_1_processed)
 }
 
-form3_working_data <- form3_processing_fn()
-
-
+form3_working_data <- form3_processing_fn() %>% mutate(f2_flag=1)
 
 # Form 3.1 ----------------------------------------------------------------
 
@@ -404,21 +563,40 @@ form3.1_raw <- here('data', 'input', 'Tafea_form 3.1_FOR STATA.xlsx')
 form3.1_raw <- read_xlsx(form3.1_raw)
 
 form3.1_processed <- form3.1_raw %>%
-    mutate(
-      f31_area_council_fct = factor(f31_area_council, levels = area_council_names),
-      f31_village_fct = factor(f31_village, levels = c(village_names)),
-      across(
-        ethanol_f31_vars,
-        factor,
-        levels = c('N', 'Y'),
-        labels = c('No', "Yes"),
-        .names = "{.col}_fct"
+  mutate(
+    f31_area_council_fct = factor(
+      tolower(f31_area_council),
+      levels = c(
+        'aneityum',
+        'south west tanna',
+        'whitesands',
+        'south tanna',
+        'middle bush',
+        'futuna',
+        'west tanna'
       )
-    ) %>% clean_data()
+    ),
+    f31_village = case_when(f31_village=='Imarkak' ~ 'Imarkakak', 
+                            TRUE ~ f31_village),
+    f31_village_fct = factor(tolower(f31_village), levels = c(village_names)),
+    across(
+      ethanol_f31_vars,
+      factor,
+      levels = c('N', 'Y'),
+      labels = c('No', "Yes"),
+      .names = "{.col}_fct"
+    )) %>%
+  clean_data() %>% 
+  mutate(f31_flag=1)
+
 return(form3.1_processed)
 }
 
 form3.1_working_data <- form3.1_processing_fn() 
+
+
+form3_3.1_merged <- form3_working_data %>% left_join(form3.1_working_data, 
+                                 by='mda_code')
 
 
 # Form 10 -----------------------------------------------------------------
@@ -429,23 +607,41 @@ form10_raw <- read_xlsx(form10_raw)
 
 
   form10_processed <- form10_raw %>%
+    clean_data() %>% 
+    mutate(f10_village = case_when(f10_village=='imarkak' ~ 'imarkakak', 
+                                   TRUE ~ f10_village)) %>% 
     mutate(
-      f10_area_council_fct = factor(f10_area_council, levels = area_council_names),
-      f10_village_fct = factor(f10_village, levels = c(village_names)),
+      f10_area_council_fct = factor(f10_area_council, levels = c('aneityum', 
+                                                                 'south_west_tanna', 
+                                                                 'whitesands', 
+                                                                 'south_tanna', 
+                                                                 'middle_bush', 
+                                                                 'futuna', 
+                                                                 'west_tanna')),
+      f10_village_fct = factor(f10_village, levels = (lower_village_names)),
       across(
         f10_ethanol,
         factor,
-        levels = c('N', 'Y'),
-        labels = c('No', "Yes"),
+        levels = c('n', 'y'),
+        labels = c('no', "yes"),
         .names = "{.col}_fct"
       )
-    ) %>% clean_data()
+    ) %>% 
+    mutate(f10_flag=1) %>% 
+    mutate(drop_dup=case_when((f10_village_fct=='imarkakak' & mda_code=='9_003_03_11') ~ 1)) %>% 
+   # filter(!drop_dup==1) %>% 
+    group_by(mda_code) %>% 
+    mutate(myorder = 1:n()) %>% 
+    filter(myorder==1) 
+    #select(-c(count,drop_dup))
+  
+  
+  
 
 return(form10_processed)
 }
 
 form10_working_data <- form10_processing_fn()
-
 
 # Form 11 -----------------------------------------------------------------
 
@@ -453,18 +649,43 @@ form11_processing_fn <- function() {
 form11_raw <- here('data', 'input', 'Tafea_form 11_FOR STATA.xlsx')
 form11_raw <- read_xlsx(form11_raw)
 
+form11_processed <- form11_raw %>%
+  clean_data() %>% 
+  mutate(
+    f11_area_council_fct = factor(f11_area_council, levels = c('aneityum', 
+                                                               'south_west_tanna', 
+                                                               'whitesands', 
+                                                               'south_tanna', 
+                                                               'middle_bush', 
+                                                               'futuna', 
+                                                               'west_tanna')),
+    f11_village_fct = factor(f11_village, levels = (lower_village_names)),
+    results_flag=1
+  ) %>% 
+  # mutate(mda_code=ifelse((mda_code=='9_003_03_11' &  f11_village_fct=='imarkak'), NA, 
+  #                        mda_code)) %>% 
+  # mutate(mda_code=ifelse((mda_code=='9_004_14_16' &  f11_village_fct=='lownasunan'), NA, 
+  #                        mda_code)) %>% 
+  # mutate(mda_code=case_when(mda_code=='8_001_2_01' ~ '8_001_20_01', 
+  #                           TRUE ~ mda_code)) %>% 
+  # mutate(mda_code=case_when((f11_village=='imaru' & mda_code =='8_001_01_13') ~ '8_001_01_03', 
+  #                           (f11_village=='koraioken' & mda_code =='8_002_25_09') ~ '8_001_26_09', 
+  #                           (f11_village=='yakunaus' & mda_code =='9_003_02_10') ~ '9_004_02_10', 
+  #                           TRUE ~ mda_code)) %>% 
+  group_by(mda_code) %>% 
+  mutate(count = n()) %>% 
+  filter(count==1) %>% 
+  select(-count) %>% 
+  dplyr::rename_with(~ paste0("f11_", .), -c(1:7,26:27))
 
-  form11_processed <- form11_raw %>%
-    mutate(
-      f11_area_council_fct = factor(f11_area_council, levels = area_council_names),
-      f11_village_fct = factor(f11_village, levels = c(village_names))
-    ) %>% clean_data()
 
 return(form11_processed)
 }
 
 form11_working_data <- form11_processing_fn()
+
 # Stool sample list -------------------------------------------------------
+
 stool_sample_processing_fn <- function() {
 stool_list_raw <-
   here('data',
@@ -472,39 +693,220 @@ stool_list_raw <-
        'Tafea_Stool samples sent to Melbourne_FOR STATA.xlsx')
 stool_list_raw <- read_xlsx(stool_list_raw)
 
-stool_list_processed <- stool_list_raw
+stool_list_processed <- stool_list_raw %>% clean_data()
 
 return(stool_list_processed)
 }
 
 stool_sample_working_data <- stool_sample_processing_fn()
 
+
+# qPCR results ------------------------------------------------------------
+
+qPCR_results_processing_fn <- function() {
+
+qPCR_results_raw <-
+  here('data',
+       'input',
+       'Tafea_Vanuatu_STH qPCR results.xlsx')
+
+qPCR_results_raw <- read_xlsx(qPCR_results_raw,  
+                              sheet='reshaped')
+
+qPCR_results_processed <- qPCR_results_raw %>% 
+    clean_data() %>% 
+    mutate(across(human_ct1:human_ct2, as.character)) %>% 
+    pivot_longer(-c(1:4)) %>% 
+    mutate(test_pos_neg=case_when(value=='neg' ~ 'neg',
+                                  sample_available=='not_available' ~ 'sample_not_available',
+                                  TRUE ~ 'pos')) %>% 
+    # mutate(test_pos_neg=case_when(!is.na(remark) ~ paste(test_pos_neg, remark, sep='_'),
+    #                               TRUE ~ test_pos_neg)) %>% 
+    mutate(value_integer=str_replace(value, 'neg', '')) %>% 
+    mutate(value_integer=str_replace(value_integer, '_', '.')) %>% 
+    mutate(value_integer=as.numeric(value_integer)) %>% 
+    select(unimelb_id, mda_code=sample_id, pathogen=name, result=test_pos_neg, ct_value=value_integer) %>% 
+    mutate(ct_value = case_when((mda_code == "8_001_01_09" & pathogen == "trichuris_ct2") ~ 35.64, 
+                                TRUE ~ ct_value)) %>% 
+  mutate(results_flag =1 ) 
+
+qPCR_results_processed_wide <- qPCR_results_processed %>% 
+  pivot_wider(names_from=pathogen, values_from=c('result', 'ct_value')) %>% 
+  dplyr::rename_with(~ paste0("qPCR_", .), -mda_code)
+
+
+return(qPCR_results_processed_wide)
+}
+
+qpcr_results_working_data <- qPCR_results_processing_fn()
+
 # Data checking -----------------------------------------------------------
 
 # Data merging ------------------------------------------------------------
+############### QUESTIONNAIRES 
 
-merged_data_all <- form2_working_data %>% 
-  left_join(form3_working_data, by=c('mda_code',
-                                    'f2_participant_name' = 'f3_participant_name')) %>%
-  left_join(form3.1_working_data, by=c('mda_code')) %>%
-  left_join(skin_exam_working_data, by=c('mda_code', 
-                                          'f2_participant_name' = 'participant_name')) %>% 
-  left_join(dbs_working_data, by=c('mda_code')) %>% 
-  left_join(form10_working_data, by=c('mda_code')) %>% 
-  left_join(form11_working_data, by=c('mda_code'))
+#### Merge form 2 and skin exam data
+# Correct some names and mda codes in skin exam data 
+correct_skin_data_fn <- function() {
+  form2_skin_exam_anti_join <- skin_exam_working_data %>% anti_join(form2_working_data, by='mda_code', 
+                                                                    'skin_exam_participant_name' = 'f2_participant_name') %>% 
+    select(mda_code, skin_exam_participant_name, skin_exam_village,skin_exam_sex,skin_exam_age)
+  
+  skin_exam_update_name_mda_code <- form2_working_data %>% select(mda_code, f2_participant_name) %>% 
+    ungroup() %>% 
+    stringdist_inner_join(
+      form2_skin_exam_anti_join,
+      by = c("f2_participant_name" = "skin_exam_participant_name"),
+      max_dist = 3,
+      distance_col = "distance"
+    ) %>% 
+    #filter(distance!=0) %>% 
+    mutate(participant_name_upd = case_when(distance %in% c(0:2) ~ f2_participant_name)) %>% 
+    mutate(mda_code_upd = case_when(distance %in% c(0:2) ~ mda_code.x)) %>% 
+    select(participant_name=skin_exam_participant_name, 
+           village=skin_exam_village,
+           sex=skin_exam_sex,
+           age=skin_exam_age, 
+           participant_name_upd, 
+           mda_code_upd) %>% 
+    filter(!is.na(participant_name_upd))
+  
+  #saveRDS(skin_exam_update_name_mda_code, here('data', 'robjects', 'skin_exam_update_name_mda_code.Rds'))
+}
+
+form2_skin_exam_merged <- form2_working_data %>% 
+  full_join(skin_exam_working_data, by='mda_code', 
+                                 'f2_participant_name' = 'skin_exam_participant_name')
+
+### 1192 matches, 302 in x, 18 in y 
+
+#### Merge swab data to form2-skin exam data
+
+form2_skin_exam_merged %>% inner_join(skin_swab_working_data, by=c('mda_code' = 'sore_swap_samples'))
+
+#### 0 matches 
+
+######### DIAGNOSTICS
+
+######Merge stool sample data with qPCR results
+
+stool_receipt_qpcr_results <- stool_sample_working_data %>% 
+  full_join(qpcr_results_working_data, by='mda_code')
+
+# 1 record from qPCR results file does not merge, but this is the record marked as "sample not available"
+# There is 1 record (mda code 8_001_01_19) that has a "0" for sample_yn in  stool_sample_working_data, but has results in qpcr_results_working_data 
+
+# Merge form 3.1 and 10
+
+form3.1_10_merge <- form3.1_working_data %>% 
+  full_join(form10_working_data, by='mda_code') %>% 
+  filter(is.na(f10_flag) | is.na(f31_flag)) %>% 
+  mutate(village=coalesce(f31_village_fct, f10_village_fct)) %>% 
+  mutate(area_council=coalesce(f31_area_council_fct,f10_area_council_fct )) %>% 
+  select(mda_code, village, area_council, f10_flag, f31_flag) %>% 
+  arrange(area_council,village,mda_code)
+
+# Merge form 10 and 11
+
+form3.1_10_11_merge <- form3.1_10_merge %>% 
+  full_join(form11_working_data, by='mda_code')
+
+# mda_id_sample_merge <- form3.1_working_data %>% mutate(mda_code_3.1=mda_code) %>% 
+#   full_join(form10_working_data %>% mutate(mda_code_10=mda_code), by='mda_code') %>% 
+#   full_join(form11_working_data %>% mutate(mda_code_11=mda_code), by='mda_code') %>% 
+#   full_join(qpcr_results_working_data %>% mutate(mda_code_qpcr=mda_code),by='mda_code') %>% 
+#   select(contains('mda_code'))
+#   
+# 
+# mda_id_sample_merge %>% pivot_longer(-mda_code) %>% filter(!is.na(value)) %>% 
+#   count(mda_code)
+
+##### Merge with form 11 for SNF results
+stool_receipt_qpcr_results_form11 <-  stool_receipt_qpcr_results %>%
+  filter(sample_yn == 1 | qPCR_results_flag == 1) %>%
+  full_join(form11_working_data, by = 'mda_code') %>% 
+  select(qPCR_unimelb_id,
+    mda_code,
+    f11_area_council_fct,
+    f11_village_fct,
+    sample_yn,
+    qPCR_results_flag,
+    f11_results_flag,
+    contains('ascaris'),
+    contains('trichuris'),
+    contains('strongyloides'),
+    contains('hookworm'),
+    contains('other_sth'),
+    contains('necator'),
+    contains('a_cey'),
+    contains('a_duod'),
+    contains('human')
+  ) %>% 
+  mutate(f11_result_ascaris=case_when(f11_ascaris_epg>0 ~ 'pos',
+                                      TRUE ~ 'neg')) %>% 
+  mutate(f11_result_trichuris=case_when(f11_trichuris_epg>0 ~ 'pos',
+                                        TRUE ~ 'neg')) %>% 
+  mutate(f11_result_hookworm=case_when(f11_hookworm_epg>0 ~ 'pos', 
+                                       TRUE ~ 'neg')) %>% 
+  mutate(qPCR_result_hookworm = case_when(rowSums(across(c('qPCR_result_necator_ct1', 'qPCR_result_necator_ct2', 
+                                                        'qPCR_result_a_cey_ct1', 'qPCR_result_a_cey_ct2', 
+                                                        'qPCR_result_a_duod_ct1', 'qPCR_result_a_duod_ct2'), ~ .x == "pos"), 
+                                               na.rm = T)>0 ~ 'pos', 
+                                       #   is.na(qPCR_results_flag) ~ 'no qPCR match',
+                                          qPCR_result_necator_ct1== 'sample_not_available' ~ 'sample_not_available', 
+                                          TRUE ~ 'neg')) 
+
+### 10 records from qPCR don't match to form 11
+### 18 records from form 11 don't match to qPCR
+### There are 6 records with duplicate mda_code in form 11. 2 have been recoded to NA temporarily. 2 have been dropped
 
 
-# Need to add skin snips and sth results
+merged_data_all <- form2_skin_exam_merged %>% 
+#   left_join(form3_working_data, by=c('mda_code',
+#                                      'f2_participant_name' = 'f3_participant_name'))
+# left_join(form3.1_working_data, by=c('mda_code')) %>%
+  # left_join(skin_exam_working_data, by=c('mda_code', 
+  #                                        'f2_participant_name' = 'participant_name')) %>% 
+  # left_join(dbs_working_data, by=c('mda_code')) %>% 
+  # left_join(form10_working_data, by=c('mda_code')) %>% 
+  # left_join(form11_working_data, by=c('mda_code'))
+  full_join(stool_receipt_qpcr_results_form11, by=c('mda_code')) %>% 
+  ungroup()
+
+#### Diagnostics
+mda_id_sample_merge <- form3.1_working_data %>% 
+  mutate(mda_code_3.1=mda_code) %>% 
+  full_join(form10_working_data %>% mutate(mda_code_10=mda_code), by='mda_code') %>% 
+  full_join(form11_working_data %>% mutate(mda_code_11=mda_code), by='mda_code') %>% 
+  full_join(qpcr_results_working_data %>% mutate(mda_code_qpcr=mda_code),by='mda_code') %>% 
+  select(contains('mda_code'))
+
+### Questionnaire
 
 
-merged_data_name <- form2_working_data %>% 
-  inner_join(skin_exam_working_data, by=c('f2_participant_name' = 'participant_name'))
 
-library(skimr)
-skim(form11_processed)
+# Cleaning analysis dataset -----------------------------------------------
 
-risk_factor_processed %>% tabyl(roof_tiles_fct)
 
-summary(risk_factor_processed)
 
-risk_factor_processed$washing_water_all_year_time_specify
+analysis_data <- merged_data_all 
+  
+saveRDS(analysis_data, here('analysis_data.Rds'))
+  
+ 
+analysis_data %>% tabyl(f2_sex_fct)
+
+
+
+# x %>% tabyl( skin_exam_yaws_suspected_fct, skin_exam_yaws_saw_lesion_fct)
+# 
+# x <- merged_data_all %>% filter(skin_exam_yaws_dpp_result_fct %in% c('positive_active_yaws', 'negative_no_yaws'))
+# 
+# table(skin_exam_working_data$skin_exam_yaws_village_arrive_6m_fct)
+#   # mutate(skin_exam_scabies_typical_lesions_fct = ifelse(skin_exam_scabies_scratching_24_fct=='no', 
+#   #                                                       'no scabies lesions detected',
+#   #                                                       skin_exam_scabies_typical_lesions_fct ))
+#   
+#                                     
+# mutate(Revenue = replace(Revenue, is.na(Revenue) & Date <= max.date, 0))
+

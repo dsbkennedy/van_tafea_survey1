@@ -1,0 +1,210 @@
+---
+title: "Tafea: Survey round 1"
+format: docx
+execute:
+  echo: false
+  warning: false
+editor: visual
+---
+
+```{r}
+library(here)
+library(skimr)
+library(tidyverse)
+pacman::p_load(table1)
+
+#source(here::here('01_data_cleaning.R'))
+analysis_data <- readRDS(here('analysis_data.Rds'))
+source(here::here('variable_labels.R'))
+```
+
+```{r}
+#skimr::skim(analysis_data)
+```
+
+## Form 2
+
+```{r}
+table1(~ f2_sex_fct + 
+         f2_age  +
+         f2_age_group +
+       f2_present_fct +
+       f2_consent_fct +
+       f2_stool_container_fct +
+       f2_questionnaire_fct +
+       f2_stool_sample_fct +
+       f2_leprosy_suspected_fct +
+       f2_yaws_suspected_fct +
+       f2_ssd_suspected_fct +
+       f2_soap_fct +
+        f2_treated_fct +
+         f2_azith_any_fct +
+         f2_alb_any_fct +
+         f2_ivm_any_fct +
+         f2_pm_any_fct +
+       f2_no_treat_a_fct +
+       f2_no_treat_b_fct +
+       f2_no_treat_c_fct, 
+       data=analysis_data)
+
+```
+
+## Form 2 by sex
+
+```{r}
+table1(~ f2_age + 
+         f2_age_group +
+         f2_present_fct +
+         f2_consent_fct +
+         f2_stool_container_fct +
+         f2_questionnaire_fct +
+         f2_stool_sample_fct +
+         f2_leprosy_suspected_fct +
+         f2_yaws_suspected_fct +
+         f2_ssd_suspected_fct +
+         f2_soap_fct +
+         f2_treated_fct +
+         f2_azith_any_fct +
+         f2_alb_any_fct +
+         f2_ivm_any_fct +
+         f2_pm_any_fct +
+         f2_no_treat_a_fct +
+         f2_no_treat_b_fct +
+         f2_no_treat_c_fct | f2_sex_fct, 
+       data=analysis_data %>% mutate(f2_sex_fct=fct_explicit_na(f2_sex_fct, 'Missing sex'))
+)
+```
+
+## Form 2 by age group
+
+```{r}
+table1(~ f2_sex_fct +
+         f2_present_fct +
+         f2_consent_fct +
+         f2_stool_container_fct +
+         f2_questionnaire_fct +
+         f2_stool_sample_fct +
+         f2_leprosy_suspected_fct +
+         f2_yaws_suspected_fct +
+         f2_ssd_suspected_fct +
+         f2_soap_fct +
+         f2_treated_fct +
+         f2_azith_any_fct +
+         f2_alb_any_fct +
+         f2_ivm_any_fct +
+         f2_pm_any_fct +
+         f2_no_treat_a_fct +
+         f2_no_treat_b_fct +
+         f2_no_treat_c_fct | f2_age_group, 
+       data=analysis_data %>% mutate(f2_age_group=fct_explicit_na(f2_age_group, 'Missing age group'))
+)
+```
+
+## Skin exam questions
+
+```{r}
+
+table1(~ skin_exam_scabies_scratching_24_fct +
+    skin_exam_scabies_typical_lesions_fct +
+    skin_exam_scabies_lesions_more_10_fct +
+    skin_exam_scabies_skin_infection_fct +
+    skin_exam_scabies_finished_fct+
+    skin_exam_yaws_self_report_fct+
+    skin_exam_yaws_saw_lesion_fct+
+    skin_exam_yaws_suspected_fct+
+    skin_exam_yaws_first_ulcer_fct +
+    skin_exam_yaws_previous_treatment_fct +
+    #skin_exam_yaws_village_arrive_6m_fct+
+    #skin_exam_yaws_village_travel_6m_fct+
+    skin_exam_yaws_ulcer_location_fct +
+    skin_exam_yaws_dpp_line1_fct +
+    skin_exam_yaws_dpp_line2_fct +
+    skin_exam_yaws_dpp_linec_fct +
+    skin_exam_yaws_swab_collected_fct +
+    skin_exam_yaws_dpp_result_fct +
+    skin_exam_yaws_finished_fct +
+    skin_exam_leprosy_self_report_fct +
+    skin_exam_leprosy_saw_lesion_fct +
+    skin_exam_leprosy_suspected_fct +
+    skin_exam_ssd_none_fct +
+    skin_exam_ssd_abscess_boil_fct +
+    skin_exam_ssd_cellulitis_fct +
+    skin_exam_ssd_crusted_scabies +
+    skin_exam_ssd_other +
+    skin_exam_ssd_other_specify,
+  data = analysis_data)
+```
+
+## Skin exam questions by sex
+
+```{r}
+table1(
+  ~ skin_exam_scabies_scratching_24_fct +
+    skin_exam_scabies_typical_lesions_fct +
+    skin_exam_scabies_lesions_more_10_fct +
+    skin_exam_scabies_skin_infection_fct +
+    skin_exam_scabies_finished_fct+
+    skin_exam_yaws_self_report_fct+
+    skin_exam_yaws_saw_lesion_fct+
+    skin_exam_yaws_suspected_fct+
+    skin_exam_yaws_first_ulcer_fct +
+    skin_exam_yaws_previous_treatment_fct +
+    #skin_exam_yaws_village_arrive_6m_fct+
+    #skin_exam_yaws_village_travel_6m_fct+
+    skin_exam_yaws_ulcer_location_fct +
+    skin_exam_yaws_dpp_line1_fct +
+    skin_exam_yaws_dpp_line2_fct +
+    skin_exam_yaws_dpp_linec_fct +
+    skin_exam_yaws_swab_collected_fct +
+    skin_exam_yaws_dpp_result_fct +
+    skin_exam_yaws_finished_fct +
+    skin_exam_leprosy_self_report_fct +
+    skin_exam_leprosy_saw_lesion_fct +
+    skin_exam_leprosy_suspected_fct +
+    skin_exam_ssd_none_fct +
+    skin_exam_ssd_abscess_boil_fct +
+    skin_exam_ssd_cellulitis_fct +
+    skin_exam_ssd_crusted_scabies +
+    skin_exam_ssd_other +
+    skin_exam_ssd_other_specify | f2_sex_fct, 
+  data = analysis_data %>% mutate(f2_sex_fct=fct_explicit_na(f2_sex_fct, 'Missing sex')
+)
+)
+```
+
+## Skin exam questions by age group
+
+```{r}
+table1(
+  ~ skin_exam_scabies_scratching_24_fct +
+    skin_exam_scabies_typical_lesions_fct +
+    skin_exam_scabies_lesions_more_10_fct +
+    skin_exam_scabies_skin_infection_fct +
+    skin_exam_scabies_finished_fct+
+    skin_exam_yaws_self_report_fct+
+    skin_exam_yaws_saw_lesion_fct+
+    skin_exam_yaws_suspected_fct+
+    skin_exam_yaws_first_ulcer_fct +
+    skin_exam_yaws_previous_treatment_fct +
+    #skin_exam_yaws_village_arrive_6m_fct+
+    #skin_exam_yaws_village_travel_6m_fct+
+    skin_exam_yaws_ulcer_location_fct +
+    skin_exam_yaws_dpp_line1_fct +
+    skin_exam_yaws_dpp_line2_fct +
+    skin_exam_yaws_dpp_linec_fct +
+    skin_exam_yaws_swab_collected_fct +
+    skin_exam_yaws_dpp_result_fct +
+    skin_exam_yaws_finished_fct +
+    skin_exam_leprosy_self_report_fct +
+    skin_exam_leprosy_saw_lesion_fct +
+    skin_exam_leprosy_suspected_fct +
+    skin_exam_ssd_none_fct +
+    skin_exam_ssd_abscess_boil_fct +
+    skin_exam_ssd_cellulitis_fct +
+    skin_exam_ssd_crusted_scabies +
+    skin_exam_ssd_other +
+    skin_exam_ssd_other_specify | f2_age_group, 
+  data = analysis_data %>% mutate(f2_age_group=fct_explicit_na(f2_age_group, 'Missing age group')
+  )
+)
+```
