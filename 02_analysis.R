@@ -1,8 +1,11 @@
 pacman::p_load(table1)
 # Analysis ----------------------------------------------------------------
 
-source(here('variable_labels.R'))
+theme_gtsummary_journal(journal = "jama")
+theme_gtsummary_compact()
 
+
+source(here('variable_labels.R'))
 
 table1(~ f2_sex_fct + 
          f2_age  +
@@ -24,14 +27,20 @@ table1(~ f2_sex_fct +
        f2_no_treat_a_fct +
        f2_no_treat_b_fct +
        f2_no_treat_c_fct, 
-       data=analysis_data %>% filter(f2_flag==1))
+       data=form2_working_data %>% filter(f2_flag==1))
 
 pacman::p_load(gtsummary)
 
-analysis_data %>% filter(f2_flag==1) %>% 
-  tabyl(f2_present_fct, )
+label(form2_working_data$f2_sex_fct) <- "Sex"
+label(form2_working_data$f2_age) <- "Age"
+label(form2_working_data$f2_age_group) <- "Age group"
+label(form2_working_data$f2_present_fct) <- "Is person present?"
+label(form2_working_data$f2_consent_fct) <- "Does person consent?"
+label(form2_working_data$f2_stool_container_fct) <- "Is stool container provided?"
+label(form2_working_data$f2_questionnaire_fct) <- "Is questionnaire completed?"
+label(form2_working_data$f2_stool_sample_fct) <- " Was stool sample provided?"
 
-analysis_data %>% filter(f2_flag==1) %>% 
+form2_working_data %>% filter(f2_flag==1) %>% 
   # mutate(
   #   f2_consent_fct = case_when(
   #     f2_present_fct == 'yes' ~
@@ -54,7 +63,7 @@ analysis_data %>% filter(f2_flag==1) %>%
                 missing_text = "Missing")   %>% 
   add_overall() 
 
-analysis_data %>% filter(f2_flag==1) 
+form2_working_data %>% filter(f2_flag==1) %>% 
   select(f2_age_group,
          f2_leprosy_suspected_fct,
          f2_yaws_suspected_fct, 
@@ -65,8 +74,7 @@ analysis_data %>% filter(f2_flag==1)
               digits = all_continuous() ~ 1,                             
               type   = all_categorical() ~ "categorical",                 
               missing_text = "Missing")   %>% 
-  add_overall() %>% 
-  add_ci()
+  add_overall()
   
 
 
@@ -192,25 +200,25 @@ table1(~ skin_exam_scabies_scratching_24_fct +
 
 # Scabies -----------------------------------------------------------------
 
-scabies_data <- analysis_data %>%
+scabies_data <- skin_exam_working_data %>%
   filter(skin_exam_flag == 1) %>%
   #filter(f2_present_fct == 'yes') %>%
   select(
-    f2_age_group,
+    skin_exam_age_group,
     skin_exam_scabies_scratching_24_fct,
     skin_exam_scabies_typical_lesions_fct,
     skin_exam_scabies_lesions_more_10_fct,
     skin_exam_scabies_skin_infection_fct,
     skin_exam_scabies_finished_fct
-  ) %>% 
-  mutate(skin_exam_scabies_lesions_more_10_fct=factor(case_when(
-    skin_exam_scabies_scratching_24_fct=='no' ~ 'no itching/scratching reported', 
-    is.na(skin_exam_scabies_lesions_more_10_fct) ~ 'question not relevant', 
-         TRUE ~ as.character(skin_exam_scabies_lesions_more_10_fct)), levels=c('yes', 'no', 'question not relevant', 'no itching/scratching reported')))  %>% 
-  mutate(skin_exam_scabies_skin_infection_fct=factor(case_when(
-    skin_exam_scabies_scratching_24_fct=='no' ~ 'no itching/scratching reported', 
-    is.na(skin_exam_scabies_skin_infection_fct) ~ 'question not relevant', 
-    TRUE ~ as.character(skin_exam_scabies_skin_infection_fct)), levels=c('yes', 'no', 'question not relevant', 'no itching/scratching reported')))  
+  )
+  # mutate(skin_exam_scabies_lesions_more_10_fct=factor(case_when(
+  #   skin_exam_scabies_scratching_24_fct=='no' ~ 'no itching/scratching reported', 
+  #   is.na(skin_exam_scabies_lesions_more_10_fct) ~ 'question not relevant', 
+  #        TRUE ~ as.character(skin_exam_scabies_lesions_more_10_fct)), levels=c('yes', 'no', 'question not relevant', 'no itching/scratching reported')))  %>% 
+  # mutate(skin_exam_scabies_skin_infection_fct=factor(case_when(
+  #   skin_exam_scabies_scratching_24_fct=='no' ~ 'no itching/scratching reported', 
+  #   is.na(skin_exam_scabies_skin_infection_fct) ~ 'question not relevant', 
+  #   TRUE ~ as.character(skin_exam_scabies_skin_infection_fct)), levels=c('yes', 'no', 'question not relevant', 'no itching/scratching reported')))  
   # mutate(
   #   skin_exam_scabies_typical_lesions_fct = case_when(
   #     skin_exam_scabies_scratching_24_fct == 'yes' ~
@@ -241,40 +249,21 @@ label(scabies_data$skin_exam_scabies_skin_infection_fct) <- "Scabies: 4. Is ther
 label(scabies_data$skin_exam_scabies_finished_fct) <- "Scabies: 5. Examination complete"
 
 scabies_data %>% 
-  tbl_summary(by = f2_age_group, 
+  tbl_summary(by = skin_exam_age_group, 
               statistic = list(all_continuous() ~ "{mean} ({sd})",        
                                all_categorical() ~ "{n} / {N} ({p}%)"),   
               #digits = all_continuous() ~ 1,                             
                    type   = all_categorical() ~ "categorical",                 
-              missing_text = "Question not relevant/No response")   %>% 
+              missing_text = "no scabies lesions observed")   %>% 
   add_overall() 
-#add_ci()
-
-
-table1(~skin_exam_yaws_self_report_fct +
-       skin_exam_yaws_saw_lesion_fct+
-       skin_exam_yaws_suspected_fct+
-         skin_exam_yaws_first_ulcer_fct+
-       skin_exam_yaws_previous_treatment_fct+
-       #skin_exam_yaws_village_arrive_6m_fct+
-       #skin_exam_yaws_village_travel_6m_fct+
-         skin_exam_yaws_ulcer_location_fct+
-       skin_exam_yaws_dpp_line1_fct+
-       skin_exam_yaws_dpp_line2_fct+
-       skin_exam_yaws_dpp_linec_fct+
-       skin_exam_yaws_swab_collected_fct+
-       skin_exam_yaws_dpp_result_fct +
-         skin_exam_yaws_finished_fct,
-       data=analysis_data)
-
+  #add_ci()
 
 
 # Leprosy -----------------------------------------------------------------
-leprosy_data <- analysis_data %>%
+leprosy_data <- skin_exam_working_data %>%
   filter(skin_exam_flag == 1) %>%
-  filter(f2_present_fct == 'yes') %>%
   select(
-    f2_age_group,
+    skin_exam_age_group,
     skin_exam_leprosy_self_report_fct,
     skin_exam_leprosy_saw_lesion_fct,
     skin_exam_leprosy_suspected_fct
@@ -296,7 +285,7 @@ label(leprosy_data$skin_exam_leprosy_saw_lesion_fct) <- "Leprosy: 1A. If not sel
 label(leprosy_data$skin_exam_leprosy_suspected_fct) <- "Leprosy: 2. Suspected"
 
 leprosy_data %>% 
-  tbl_summary(by = f2_age_group, 
+  tbl_summary(by = skin_exam_age_group, 
               statistic = list(all_continuous() ~ "{mean} ({sd})",        
                                all_categorical() ~ "{n} / {N} ({p}%)"),   
               digits = all_continuous() ~ 1,                             
@@ -310,8 +299,40 @@ table1(~ skin_exam_leprosy_self_report_fct+
          skin_exam_leprosy_suspected_fct,
        data=leprosy_data)
 
+skin_exam_working_data  %>% count(skin_exam_leprosy_self_report_fct, skin_exam_leprosy_saw_lesion_fct,skin_exam_leprosy_suspected_fct)
+
 
 # Severe skin disease -----------------------------------------------------
+
+ssd_data <- skin_exam_working_data %>%
+  filter(skin_exam_flag == 1) %>%
+  select(skin_exam_age_group,
+         skin_exam_ssd_none_fct,
+           skin_exam_ssd_abscess_boil_fct,
+           skin_exam_ssd_cellulitis_fct,
+           skin_exam_ssd_crusted_scabies,
+           skin_exam_ssd_other,
+           skin_exam_ssd_other_specify)
+
+ssd_data %>% count(skin_exam_ssd_none_fct, skin_exam_ssd_abscess_boil_fct, skin_exam_ssd_cellulitis_fct,
+                   skin_exam_ssd_crusted_scabies,skin_exam_ssd_other)
+
+label(ssd_data$f2_ssd_suspected_fct) <- "SSD: 1. Self-reported SSD "
+label(ssd_data$skin_exam_ssd_none_fct) <- "SSD: 1. Self-reported SSD - None"
+label(ssd_data$skin_exam_ssd_abscess_boil_fct) <- "SSD: 1. Self-reported SSD - Abscess or boil"
+label(ssd_data$skin_exam_ssd_cellulitis_fct) <- "SSD: 1. Self-reported SSD - Cellulitis"
+label(ssd_data$skin_exam_ssd_crusted_scabies) <- "SSD: 1. Self-reported SSD - Crusted scabies"
+label(ssd_data$skin_exam_ssd_other) <- "SSD: 1. Self-reported SSD - Other"
+label(ssd_data$skin_exam_ssd_other_specify) <- "SSD: 1. Self-reported SSD - Other (specify)"
+
+ssd_data %>% 
+  tbl_summary(by = skin_exam_age_group, 
+              statistic = list(all_continuous() ~ "{mean} ({sd})",        
+                               all_categorical() ~ "{n} / {N} ({p}%)"),   
+              digits = all_continuous() ~ 1,                             
+              type   = all_categorical() ~ "categorical",                 
+              missing_text = "Question not relevant/No response")   %>% 
+  add_overall() 
 
 
 

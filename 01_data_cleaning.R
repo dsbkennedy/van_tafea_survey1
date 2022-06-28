@@ -5,6 +5,8 @@ library(janitor)
 library(readxl)
 library(tidylog)
 library(fuzzyjoin)
+library(table1)
+library(gtsummary)
 source(here('labels_levels.R'))
 pacman::p_load(arsenal)
 
@@ -160,66 +162,26 @@ skin_exam_update_name_mda_code <- readRDS(here('data', 'robjects', 'skin_exam_up
     select(-c(sex, province, area_council,village, skin_varlist, skin_checklist, yaws_first_ulcer)) %>% 
     mutate(flag=1) %>%
     dplyr::rename_with(~ paste0("skin_exam_", .), -c(mda_code)) %>% 
+    mutate(skin_exam_age_group=factor(case_when(skin_exam_age ==0 ~ '<1 YOA',
+                                                skin_exam_age %in% c(1:4) ~ 'PSAC 1-4',
+                                                skin_exam_age %in% c(5:14) ~ 'SAC 5-14',
+                                                skin_exam_age >=15 ~ 'ADULTS >15'), levels=c('<1 YOA','PSAC 1-4', 'SAC 5-14','ADULTS >15'))) %>% 
     ###############SCABIES
     mutate(skin_exam_scabies_lesions_more_10_fct=factor(case_when(
-      skin_exam_scabies_scratching_24_fct=='no' ~ 'no itching/scratching reported', 
-      is.na(skin_exam_scabies_lesions_more_10_fct) ~ 'question not relevant', 
-      TRUE ~ as.character(skin_exam_scabies_lesions_more_10_fct)), levels=c('yes', 'no', 'question not relevant', 'no itching/scratching reported')))  %>% 
+      skin_exam_scabies_typical_lesions_fct=='no' ~ NA_character_, 
+      #is.na(skin_exam_scabies_lesions_more_10_fct) ~ 'question not relevant', 
+      TRUE ~ as.character(skin_exam_scabies_lesions_more_10_fct)), 
+      levels=c('yes', 'no')))  %>% 
     mutate(skin_exam_scabies_skin_infection_fct=factor(case_when(
-      skin_exam_scabies_scratching_24_fct=='no' ~ 'no itching/scratching reported', 
-      is.na(skin_exam_scabies_skin_infection_fct) ~ 'question not relevant', 
-      TRUE ~ as.character(skin_exam_scabies_skin_infection_fct)), levels=c('yes', 'no', 'question not relevant', 'no itching/scratching reported')))  %>% 
-    # mutate(across(c(skin_exam_scabies_typical_lesions_fct,
-    #                 skin_exam_scabies_lesions_more_10_fct, 
-    #                 skin_exam_scabies_skin_infection_fct),~ case_when(skin_exam_scabies_scratching_24_fct=='no' ~ 'no itching/scratching reported',
-    #                                                                   .=='no' ~ 'no',
-    #                                                                   .=='yes' ~ 'yes'))) %>% 
-    # mutate(across(c(skin_exam_scabies_typical_lesions_fct,
-    #                 skin_exam_scabies_lesions_more_10_fct, 
-    #                 skin_exam_scabies_skin_infection_fct), ~ factor(., levels=c('yes', 'no', 'no itching/scratching reported')))) %>% 
-    
-    #############YAWS
-    mutate(skin_exam_yaws_saw_lesion_fct = case_when(skin_exam_yaws_self_report_fct=='yes' ~ 'yaws lesion self-reported',
-                                                     skin_exam_yaws_saw_lesion_fct=='yes' ~ 'yes', 
-                                                     skin_exam_yaws_suspected_fct=='yes' ~ 'yes',
-                                                     skin_exam_yaws_saw_lesion_fct=='no' ~ 'no')) %>% 
-    mutate(skin_exam_yaws_saw_lesion_fct=factor(skin_exam_yaws_saw_lesion_fct, levels=c('yes', 'no', 'yaws lesion self-reported'))) %>% 
-    mutate(across(c(skin_exam_yaws_suspected_fct,
-                    skin_exam_yaws_previous_treatment_fct,
-                    #skin_exam_yaws_village_arrive_6m_fct,
-                    #skin_exam_yaws_village_travel_6m_fct,
-                    skin_exam_yaws_dpp_line1_fct,
-                    skin_exam_yaws_dpp_line2_fct,
-                    skin_exam_yaws_dpp_linec_fct,
-                    skin_exam_yaws_swab_collected_fct,
-                    skin_exam_yaws_first_ulcer_fct),~ case_when(skin_exam_yaws_self_report_fct=='no' & 
-                                                                  skin_exam_yaws_saw_lesion_fct =='no' ~ 'no yaws lesion detected',
-                                                                .=='no' ~ 'no',
-                                                                .=='yes' ~ 'yes'))) %>% 
-    mutate(across(c(skin_exam_yaws_suspected_fct,
-                    skin_exam_yaws_previous_treatment_fct,
-                   # skin_exam_yaws_village_arrive_6m_fct,
-                    #skin_exam_yaws_village_travel_6m_fct,
-                    skin_exam_yaws_dpp_line1_fct,
-                    skin_exam_yaws_dpp_line2_fct,
-                    skin_exam_yaws_dpp_linec_fct,
-                    skin_exam_yaws_swab_collected_fct,
-                    skin_exam_yaws_first_ulcer_fct), ~ factor(., levels=c('yes', 'no', 'no yaws lesion detected')))) %>% 
-    mutate(skin_exam_yaws_dpp_result_fct=case_when(skin_exam_yaws_self_report_fct=='no' & 
-                                                     skin_exam_yaws_saw_lesion_fct =='no' ~ 'no yaws lesion detected',
-                                                   skin_exam_yaws_dpp_result_fct=='positive_active_yaws' ~ 'positive_active_yaws',
-                                                   skin_exam_yaws_dpp_result_fct=='old_treated_yaws' ~ 'old_treated_yaws',
-                                                   skin_exam_yaws_dpp_result_fct=='negative_no_yaws' ~ 'negative_no_yaws',
-                                                   skin_exam_yaws_dpp_result_fct=='false_positive' ~ 'false_positive')) %>% 
+      skin_exam_scabies_typical_lesions_fct=='no' ~ 'no scabies lesions observed', 
+      #is.na(skin_exam_scabies_skin_infection_fct) ~ 'question not relevant', 
+      TRUE ~ as.character(skin_exam_scabies_skin_infection_fct)), levels=c('yes', 'no', 'no scabies lesions observed')))  %>% 
+    mutate(skin_exam_yaws_saw_lesion_fct=factor(case_when(skin_exam_yaws_self_report_fct=='yes' ~ NA_character_,
+                                                          TRUE ~as.character(skin_exam_yaws_saw_lesion_fct)), levels=c('yes', 'no'))) %>% 
     mutate(skin_exam_yaws_dpp_result_fct=factor(skin_exam_yaws_dpp_result_fct, levels=c('positive_active_yaws',
                                                                                         'old_treated_yaws', 
                                                                                         'negative_no_yaws', 
-                                                                                        'false_positive', 
-                                                                                        'no yaws lesion detected'))) %>% 
-    mutate(skin_exam_yaws_ulcer_location_fct = factor(if_else((skin_exam_yaws_self_report_fct=='no' & 
-                                                                 skin_exam_yaws_saw_lesion_fct =='no'),
-                                                              'no yaws lesion detected', 
-                                                              as.character(skin_exam_yaws_ulcer_location_fct)))) %>% 
+                                                                                        'false_positive'))) %>% 
     mutate(skin_exam_leprosy_saw_lesion_fct = case_when(skin_exam_leprosy_self_report_fct=='yes' ~ 'leprosy lesion self-reported',
                                                         skin_exam_leprosy_saw_lesion_fct=='yes' ~ 'yes', 
                                                         skin_exam_leprosy_suspected_fct=='yes' ~ 'yes',
@@ -245,6 +207,7 @@ return(skin_exam_processed)
 }
 
 skin_exam_working_data <- skin_exam_processing_fn() 
+saveRDS(skin_exam_working_data, here('skin_exam_data.Rds'))
 
 # DBS ---------------------------------------------------------------------
 
@@ -274,14 +237,6 @@ return(skin_swab_processed)
 skin_swab_working_data <- skin_swab_processing_fn()
 
 # Form 2 ------------------------------------------------------------------
-
-age_groups <-
-  c(paste(seq(0, 20, by = 20), seq(0 + 20 - 1, 40 - 1, by = 20),
-          sep = "-"), paste(40, "+", sep = ""))
-
-age_group_fn <- function(x) {
-  cut(x,breaks = c(seq(0, 40, by = 20), Inf),labels = age_groups, right = FALSE)
-}
 
 
 form2_processing_fn <- function() {
@@ -517,6 +472,9 @@ return(form2_1_processed_upd)
 }
 
 form2_working_data <- form2_processing_fn() %>% ungroup()
+
+saveRDS(form2_working_data, here('form2_working_data.Rds'))
+
 
 # Form 3 ------------------------------------------------------------------
 
@@ -898,12 +856,12 @@ stool_receipt_qpcr_results_form11 <-  stool_receipt_qpcr_results %>%
 merged_data_all <- form2_skin_exam_merged %>% 
 #   left_join(form3_working_data, by=c('mda_code',
 #                                      'f2_participant_name' = 'f3_participant_name'))
-# left_join(form3.1_working_data, by=c('mda_code')) %>%
+  full_join(form3.1_working_data, by=c('mda_code')) %>%
   # left_join(skin_exam_working_data, by=c('mda_code', 
   #                                        'f2_participant_name' = 'participant_name')) %>% 
   # left_join(dbs_working_data, by=c('mda_code')) %>% 
-  # left_join(form10_working_data, by=c('mda_code')) %>% 
-  # left_join(form11_working_data, by=c('mda_code'))
+  full_join(form10_working_data, by=c('mda_code')) %>%
+ #full_join(form11_working_data, by=c('mda_code')) %>% 
   full_join(stool_receipt_qpcr_results_form11, by=c('mda_code')) %>% 
   ungroup()
 
