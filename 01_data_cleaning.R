@@ -95,13 +95,19 @@ risk_factor_raw <- read_xlsx(risk_factor_raw)
         levels = c(0, 1),
         labels = c('Incomplete', 'Complete')
       )
-    )
+    ) %>% 
+    tidyr::separate(mda_code, into=c('province', 'book', 'page', 'line')) %>% 
+    mutate(area_council_fct=factor(case_when(area_council_fct=='south_west_t' ~ 'south_west_tanna', 
+                                             TRUE ~ as.character(area_council_fct)))) %>% 
+    mutate(key=paste(area_council_fct, village_fct, province, book,page,household_id, sep='_')) %>% 
+    mutate(flag=1) %>%
+    dplyr::rename_with(~ paste0("risk_factor_", .), -c(key)) 
 )
 
 return(risk_factor_processed)
 }
 
-risk_factor_working_data <- risk_factor_processing_fn()
+risk_factor_working_data <- risk_factor_processing_fn() %>% clean_data()
 
 # Skin exam ---------------------------------------------------------------
 
@@ -119,6 +125,14 @@ skin_exam_update_name_mda_code <- readRDS(here('data', 'robjects', 'skin_exam_up
                        labels=c('male', 'female')),
       province_fct = factor(province, levels = province_names),
       area_council_fct = factor(tolower(area_council), levels = area_council_names),
+      area_council_fct=factor(case_when(area_council_fct=='south west t' ~ 'south_west_tanna', 
+                                               TRUE ~ as.character(area_council_fct))),
+      # village=case_when(village=='Ishia' ~ 'Karimasanga', 
+      #                   village=='Yakunaus' ~ 'Imarkakak', 
+      #                   village=='Loearfi' ~ 'Ipau', 
+      #                   village=='Lounapektuan' ~ 'Lounelapen', 
+      #                   village=='Loueao' ~ 'Lowkaru', 
+      #                   TRUE ~ village),
       village_fct = factor(tolower(str_trim(village)), levels = c(village_names)),
       across(
         skin_varlist,
@@ -342,22 +356,22 @@ form2_combine_fill <- form2_1_processed %>%
   arrange(mda_code, f2_participant_name) %>% 
   fill(everything(), .direction = "downup") %>% 
   mutate(f2_flag=1) %>% 
-  mutate(f2_consent_fct=factor(case_when(f2_consent_fct=='yes' & f2_present_fct== 'yes' ~ 'yes-present',
-                                  f2_consent_fct=='yes' & f2_present_fct== 'no' ~ 'yes-not present',
-                                  f2_consent_fct=='yes' & is.na(f2_present_fct) ~ 'yes-missing',
-                                  f2_consent_fct=='no' & f2_present_fct== 'yes' ~ 'no-present',
-                                  f2_consent_fct=='no' & f2_present_fct== 'no' ~ 'no-not present',
-                                  f2_consent_fct=='no' & is.na(f2_present_fct) ~ 'no-missing'), 
-                               levels=c('yes-present', 'yes-not present','yes-missing',
-                                        'no-present', 'no-not present', 'no-missing'))) %>% 
-  mutate(f2_stool_container_fct=factor(case_when(f2_stool_container_fct=='yes' & f2_present_fct== 'yes' ~ 'yes-present',
-                                                 f2_stool_container_fct=='yes' & f2_present_fct== 'no' ~ 'yes-not present',
-                                                 f2_stool_container_fct=='yes' & is.na(f2_present_fct) ~ 'yes-missing',
-                                                 f2_stool_container_fct=='no' & f2_present_fct== 'yes' ~ 'no-present',
-                                                 f2_stool_container_fct=='no' & f2_present_fct== 'no' ~ 'no-not present',
-                                                 f2_stool_container_fct=='no' & is.na(f2_present_fct) ~ 'no-missing'), 
-                               levels=c('yes-present', 'yes-not present','yes-missing',
-                                        'no-present', 'no-not present', 'no-missing'))) %>% 
+  # mutate(f2_consent_fct=factor(case_when(f2_consent_fct=='yes' & f2_present_fct== 'yes' ~ 'yes-present',
+  #                                 f2_consent_fct=='yes' & f2_present_fct== 'no' ~ 'yes-not present',
+  #                                 f2_consent_fct=='yes' & is.na(f2_present_fct) ~ 'yes-missing',
+  #                                 f2_consent_fct=='no' & f2_present_fct== 'yes' ~ 'no-present',
+  #                                 f2_consent_fct=='no' & f2_present_fct== 'no' ~ 'no-not present',
+  #                                 f2_consent_fct=='no' & is.na(f2_present_fct) ~ 'no-missing'), 
+  #                              levels=c('yes-present', 'yes-not present','yes-missing',
+  #                                       'no-present', 'no-not present', 'no-missing'))) %>% 
+  # mutate(f2_stool_container_fct=factor(case_when(f2_stool_container_fct=='yes' & f2_present_fct== 'yes' ~ 'yes-present',
+  #                                                f2_stool_container_fct=='yes' & f2_present_fct== 'no' ~ 'yes-not present',
+  #                                                f2_stool_container_fct=='yes' & is.na(f2_present_fct) ~ 'yes-missing',
+  #                                                f2_stool_container_fct=='no' & f2_present_fct== 'yes' ~ 'no-present',
+  #                                                f2_stool_container_fct=='no' & f2_present_fct== 'no' ~ 'no-not present',
+  #                                                f2_stool_container_fct=='no' & is.na(f2_present_fct) ~ 'no-missing'), 
+  #                              levels=c('yes-present', 'yes-not present','yes-missing',
+  #                                       'no-present', 'no-not present', 'no-missing'))) %>% 
   # mutate(across(c(f2_stool_container_fct,
   #                 f2_questionnaire_fct,
   #                 f2_stool_sample_fct,
@@ -396,9 +410,9 @@ form2_combine_fill <- form2_1_processed %>%
   mutate(f2_pm_any_fct = case_when(f2_pm_2m_fct == 'yes' ~ 'yes',
                                    f2_pm_2m_12yr_fct == 'yes' ~ 'yes',
                                    f2_pm_other_fct == 'yes' ~ 'yes')) %>% 
-  mutate(f2_pm_any_fct = case_when(f2_ivm_any_fct=='yes' & f2_pm_any_fct=='no' ~ 'no-received ivermectin',
-                                   f2_ivm_any_fct=='yes' & f2_pm_any_fct=='yes' ~ 'yes-received ivermectin',
+  mutate(f2_pm_any_fct = case_when(f2_ivm_any_fct=='yes' & f2_pm_any_fct=='yes' ~ 'yes-received ivermectin',
                                    is.na(f2_pm_any_fct) & (f2_flag==1 & f2_ivm_any_fct=='no') ~ 'no',
+                                   f2_ivm_any_fct=='yes' & f2_pm_any_fct=='no' ~ 'no-received ivermectin',
                                    TRUE ~ f2_pm_any_fct)) %>% 
   mutate(f2_pm_any_fct=factor(f2_pm_any_fct, levels=c('yes','yes-received ivermectin',
                                                       'no-received ivermectin', 'no')))
@@ -466,7 +480,11 @@ form2_compare <- summary(comparedf(form2_1_processed_upd %>%
                                    int.as.num = TRUE))
 
 form2_differences_list <- form2_compare$diffs.table
+write.csv(form2_differences_list, here('data', 'form2_differences_list.csv'))
 form2_differences_summary <- form2_compare$comparison.summary.table
+write.csv(form2_differences_summary, here('data', 'form2_differences_summmary.csv'))
+
+
 
 return(form2_1_processed_upd)
 }
@@ -764,8 +782,10 @@ correct_skin_data_fn <- function() {
 }
 
 form2_skin_exam_merged <- form2_working_data %>% 
-  full_join(skin_exam_working_data, by='mda_code', 
-                                 'f2_participant_name' = 'skin_exam_participant_name')
+  full_join(skin_exam_working_data, by=c('mda_code', 
+                                 #'f2_participant_name' = 'skin_exam_participant_name',
+            #'f2_sex_fct' = 'skin_exam_sex_fct',
+            'f2_village_fct' = 'skin_exam_village_fct'))
 
 ### 1192 matches, 302 in x, 18 in y 
 
@@ -863,6 +883,11 @@ merged_data_all <- form2_skin_exam_merged %>%
   full_join(form10_working_data, by=c('mda_code')) %>%
  #full_join(form11_working_data, by=c('mda_code')) %>% 
   full_join(stool_receipt_qpcr_results_form11, by=c('mda_code')) %>% 
+  mutate(mda_code_copy=mda_code) %>% 
+  tidyr::separate(mda_code, into=c('province', 'book', 'page', 'line')) %>% 
+  mutate(key=paste(f2_area_council_fct, f2_village_fct, province, book,page,f2_household_id, sep='_')) %>% 
+  full_join(risk_factor,by='key') %>% 
+  rename(mda_code=mda_code_copy) %>% 
   ungroup()
 
 #### Diagnostics
@@ -872,8 +897,6 @@ mda_id_sample_merge <- form3.1_working_data %>%
   full_join(form11_working_data %>% mutate(mda_code_11=mda_code), by='mda_code') %>% 
   full_join(qpcr_results_working_data %>% mutate(mda_code_qpcr=mda_code),by='mda_code') %>% 
   select(contains('mda_code'))
-
-### Questionnaire
 
 
 

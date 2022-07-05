@@ -1,33 +1,9 @@
-pacman::p_load(table1)
 # Analysis ----------------------------------------------------------------
 
 theme_gtsummary_journal(journal = "jama")
 theme_gtsummary_compact()
 
-
 source(here('variable_labels.R'))
-
-table1(~ f2_sex_fct + 
-         f2_age  +
-         f2_age_group +
-       f2_present_fct +
-       f2_consent_fct +
-       f2_stool_container_fct +
-       f2_questionnaire_fct +
-       f2_stool_sample_fct +
-       f2_leprosy_suspected_fct +
-       f2_yaws_suspected_fct +
-       f2_ssd_suspected_fct +
-       f2_soap_fct +
-        f2_treated_fct +
-         f2_azith_any_fct +
-         f2_alb_any_fct +
-         f2_ivm_any_fct +
-         f2_pm_any_fct +
-       f2_no_treat_a_fct +
-       f2_no_treat_b_fct +
-       f2_no_treat_c_fct, 
-       data=form2_working_data %>% filter(f2_flag==1))
 
 pacman::p_load(gtsummary)
 
