@@ -1,14 +1,12 @@
-library(here)
-library(tidyverse)
-library(linelist)
-library(janitor)
-library(readxl)
-library(tidylog)
-library(fuzzyjoin)
-library(table1)
-library(gtsummary)
-source(here('labels_levels.R'))
-pacman::p_load(arsenal)
+
+
+packages <- c("tidyverse","here", "linelist", "janitor", "tidylog", "fuzzyjoin","table1", "gtsummary", "arsenal","readxl",
+              "sf","raster",
+              "here","tictoc")
+
+pacman::p_load(packages, character.only = TRUE)
+
+source(here('scripts', 'labels_levels.R'))
 
 
 # Risk factor -------------------------------------------------------------
@@ -96,12 +94,18 @@ risk_factor_raw <- read_xlsx(risk_factor_raw)
         labels = c('Incomplete', 'Complete')
       )
     ) %>% 
+    mutate(mda_code_risk_factor=mda_code) %>% 
     tidyr::separate(mda_code, into=c('province', 'book', 'page', 'line')) %>% 
     mutate(area_council_fct=factor(case_when(area_council_fct=='south_west_t' ~ 'south_west_tanna', 
                                              TRUE ~ as.character(area_council_fct)))) %>% 
     mutate(key=paste(area_council_fct, village_fct, province, book,page,household_id, sep='_')) %>% 
+    #rename(mda_code=mda_code_copy) %>% 
     mutate(flag=1) %>%
-    dplyr::rename_with(~ paste0("risk_factor_", .), -c(key)) 
+    dplyr::rename_with(~ paste0("risk_factor_", .), -c(key)) %>% 
+    group_by(key) %>% 
+    mutate(count=n()) %>% 
+    filter(count==1) 
+  
 )
 
 return(risk_factor_processed)
@@ -170,10 +174,10 @@ skin_exam_update_name_mda_code <- readRDS(here('data', 'robjects', 'skin_exam_up
                                         TRUE ~ participant_name)) %>%
     mutate(mda_code = case_when(!is.na(mda_code_upd) ~ mda_code_upd,
                                       TRUE ~ mda_code)) %>%
-    select(-c(participant_name_upd, mda_code_upd)) %>%
+    dplyr::select(-c(participant_name_upd, mda_code_upd)) %>%
     mutate(mda_code=case_when(mda_code=='9_003_07_139' ~ '9_003_07_13',
                               TRUE ~ mda_code)) %>% 
-    select(-c(sex, province, area_council,village, skin_varlist, skin_checklist, yaws_first_ulcer)) %>% 
+    dplyr::select(-c(sex, province, area_council,village, skin_varlist, skin_checklist, yaws_first_ulcer)) %>% 
     mutate(flag=1) %>%
     dplyr::rename_with(~ paste0("skin_exam_", .), -c(mda_code)) %>% 
     mutate(skin_exam_age_group=factor(case_when(skin_exam_age ==0 ~ '<1 YOA',
@@ -285,7 +289,7 @@ form2_1_raw <- read_xlsx(form2_1_raw)
       ),
       data_entry_person=1
     )  %>% 
-    select(-c(f2_1_sex, f2_1_area_council, f2_1_village, 
+    dplyr::select(-c(f2_1_sex, f2_1_area_council, f2_1_village, 
               all_of(form2_1_yesno))) %>% 
     clean_data() %>% 
     remove_empty('rows') %>% 
@@ -328,7 +332,7 @@ name_update <- readRDS(here('data', 'robjects', 'name_updates.Rds')) %>%
       ),
       data_entry_person=2
     ) %>% 
-    select(-c(f2_2_sex, f2_2_area_council, f2_2_village, 
+    dplyr::select(-c(f2_2_sex, f2_2_area_council, f2_2_village, 
               all_of(form2_2_yesno))) %>% 
     clean_data() %>% remove_empty('rows') %>% 
     filter(!is.na(mda_code) & !is.na(f2_2_participant_name)) %>% 
@@ -339,7 +343,7 @@ name_update <- readRDS(here('data', 'robjects', 'name_updates.Rds')) %>%
       TRUE ~ f2_participant_name_upd
     )) %>% 
     mutate(f2_2_participant_name=coalesce(f2_participant_name_upd, f2_2_participant_name)) %>%
-    select(-f2_participant_name_upd)
+    dplyr::select(-f2_participant_name_upd)
 )
 
 names(form2_2_processed) <- str_replace(names(form2_2_processed), '_2_', '_')
@@ -421,10 +425,10 @@ correct_names_fn <- function() {
   name_cleaning <- form2_combine_fill %>% 
     ungroup() %>% 
     count(f2_participant_name) %>% 
-    filter(n!=2) %>% select(-n) %>% 
+    filter(n!=2) %>% dplyr::select(-n) %>% 
     left_join(.,form2_combine_fill %>% 
                 ungroup() %>% 
-                select(mda_code,f2_participant_name, data_entry), 
+                dplyr::select(mda_code,f2_participant_name, data_entry), 
               by=c('f2_participant_name')) %>% 
     mutate(data_entry=case_when(data_entry==1 ~ 'data_entry1',
                                 data_entry==2 ~ 'data_entry2')) %>% 
@@ -432,17 +436,17 @@ correct_names_fn <- function() {
                 values_from=f2_participant_name) 
   
   name_cleaning_fuzzy <- name_cleaning %>% 
-    select(mda_code, data_entry1) %>% 
+    dplyr::select(mda_code, data_entry1) %>% 
     filter(!is.na(data_entry1)) %>% 
     stringdist_inner_join(
-      x %>% select(mda_code, data_entry2) %>% 
+      x %>% dplyr::select(mda_code, data_entry2) %>% 
         filter(!is.na(data_entry2)),
       by = c("data_entry1" = "data_entry2"),
       max_dist = 3,
       distance_col = "distance"
     ) %>% 
     mutate(f2_participant_name_upd=coalesce(data_entry1, data_entry2)) %>% 
-    select(mda_code=mda_code.x, f2_participant_name_upd)
+    dplyr::select(mda_code=mda_code.x, f2_participant_name_upd)
   
   #saveRDS(name_cleaning_fuzzy, here('data', 'robjects', 'name_updates.Rds'))
 }
@@ -455,7 +459,7 @@ mda_cleaning <- form2_combine_fill %>%
      #select(-n) %>% 
      left_join(.,form2_combine_fill %>% 
                  ungroup() %>% 
-                 select(mda_code,f2_participant_name, data_entry), 
+                 dplyr::select(mda_code,f2_participant_name, data_entry), 
                by=c('mda_code')) %>% 
      mutate(data_entry=case_when(data_entry==1 ~ 'data_entry1',
                                  data_entry==2 ~ 'data_entry2')) %>% 
@@ -467,12 +471,12 @@ form2_1_processed_upd <- form2_combine_fill %>% filter(data_entry==1)
 form2_2_processed_upd <- form2_combine_fill %>% filter(data_entry==2)
 
 form2_compare <- summary(comparedf(form2_1_processed_upd %>% 
-                                     select(-c(data_entry_person,
+                                     dplyr::select(-c(data_entry_person,
                                                data_entry, 
                                                f2_date_day1
                                      )), 
                                    form2_2_processed_upd %>% 
-                                     select(-c(data_entry_person,
+                                     dplyr::select(-c(data_entry_person,
                                                data_entry, 
                                                f2_date_day1
                                      )), 
@@ -732,7 +736,7 @@ qPCR_results_processed <- qPCR_results_raw %>%
     mutate(value_integer=str_replace(value, 'neg', '')) %>% 
     mutate(value_integer=str_replace(value_integer, '_', '.')) %>% 
     mutate(value_integer=as.numeric(value_integer)) %>% 
-    select(unimelb_id, mda_code=sample_id, pathogen=name, result=test_pos_neg, ct_value=value_integer) %>% 
+    dplyr::select(unimelb_id, mda_code=sample_id, pathogen=name, result=test_pos_neg, ct_value=value_integer) %>% 
     mutate(ct_value = case_when((mda_code == "8_001_01_09" & pathogen == "trichuris_ct2") ~ 35.64, 
                                 TRUE ~ ct_value)) %>% 
   mutate(results_flag =1 ) 
@@ -757,9 +761,9 @@ qpcr_results_working_data <- qPCR_results_processing_fn()
 correct_skin_data_fn <- function() {
   form2_skin_exam_anti_join <- skin_exam_working_data %>% anti_join(form2_working_data, by='mda_code', 
                                                                     'skin_exam_participant_name' = 'f2_participant_name') %>% 
-    select(mda_code, skin_exam_participant_name, skin_exam_village,skin_exam_sex,skin_exam_age)
+    dplyr::select(mda_code, skin_exam_participant_name, skin_exam_village,skin_exam_sex,skin_exam_age)
   
-  skin_exam_update_name_mda_code <- form2_working_data %>% select(mda_code, f2_participant_name) %>% 
+  skin_exam_update_name_mda_code <- form2_working_data %>% dplyr::select(mda_code, f2_participant_name) %>% 
     ungroup() %>% 
     stringdist_inner_join(
       form2_skin_exam_anti_join,
@@ -770,7 +774,7 @@ correct_skin_data_fn <- function() {
     #filter(distance!=0) %>% 
     mutate(participant_name_upd = case_when(distance %in% c(0:2) ~ f2_participant_name)) %>% 
     mutate(mda_code_upd = case_when(distance %in% c(0:2) ~ mda_code.x)) %>% 
-    select(participant_name=skin_exam_participant_name, 
+    dplyr::select(participant_name=skin_exam_participant_name, 
            village=skin_exam_village,
            sex=skin_exam_sex,
            age=skin_exam_age, 
@@ -812,7 +816,7 @@ form3.1_10_merge <- form3.1_working_data %>%
   filter(is.na(f10_flag) | is.na(f31_flag)) %>% 
   mutate(village=coalesce(f31_village_fct, f10_village_fct)) %>% 
   mutate(area_council=coalesce(f31_area_council_fct,f10_area_council_fct )) %>% 
-  select(mda_code, village, area_council, f10_flag, f31_flag) %>% 
+  dplyr::select(mda_code, village, area_council, f10_flag, f31_flag) %>% 
   arrange(area_council,village,mda_code)
 
 # Merge form 10 and 11
@@ -834,7 +838,7 @@ form3.1_10_11_merge <- form3.1_10_merge %>%
 stool_receipt_qpcr_results_form11 <-  stool_receipt_qpcr_results %>%
  filter(sample_yn == 1 | qPCR_results_flag == 1) %>%
   full_join(form11_working_data, by = 'mda_code') %>% 
-  select(qPCR_unimelb_id,
+  dplyr::select(qPCR_unimelb_id,
     mda_code,
     f11_area_council_fct,
     f11_village_fct,
@@ -886,7 +890,7 @@ merged_data_all <- form2_skin_exam_merged %>%
   mutate(mda_code_copy=mda_code) %>% 
   tidyr::separate(mda_code, into=c('province', 'book', 'page', 'line')) %>% 
   mutate(key=paste(f2_area_council_fct, f2_village_fct, province, book,page,f2_household_id, sep='_')) %>% 
-  full_join(risk_factor,by='key') %>% 
+  full_join(risk_factor_working_data,by='key') %>% 
   rename(mda_code=mda_code_copy) %>% 
   ungroup()
 
@@ -896,7 +900,7 @@ mda_id_sample_merge <- form3.1_working_data %>%
   full_join(form10_working_data %>% mutate(mda_code_10=mda_code), by='mda_code') %>% 
   full_join(form11_working_data %>% mutate(mda_code_11=mda_code), by='mda_code') %>% 
   full_join(qpcr_results_working_data %>% mutate(mda_code_qpcr=mda_code),by='mda_code') %>% 
-  select(contains('mda_code'))
+  dplyr::select(contains('mda_code'))
 
 
 
