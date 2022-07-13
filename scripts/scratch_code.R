@@ -366,3 +366,344 @@ sth_intensity_tbl_fn <- function() {
 
 
 
+glimpse(risk_factor_working_data)
+
+
+risk_factor_working_data %>% 
+  ggplot(aes(x=risk_factor_household_occupants)) +
+  geom_histogram() +
+  facet_wrap(~ risk_factor_area_council)
+
+risk_factor_working_data %>% ungroup() %>% 
+  summarise(mean_household_occupants=mean(risk_factor_household_occupants, na.rm=TRUE))
+
+
+risk_factor_working_data %>% ungroup() %>% 
+  group_by(risk_factor_area_council) %>% 
+  dplyr::summarise(
+    avg = mean(risk_factor_household_occupants,na.rm=TRUE),
+    lci = t.test(risk_factor_household_occupants, conf.level = 0.95)$conf.int[1],
+    uci = t.test(risk_factor_household_occupants, conf.level = 0.95)$conf.int[2]) %>% 
+  ungroup() %>% 
+  bind_rows(summarize(., region = "Overall Avg", 
+                      avg = sum(avg * n) / sum(n), 
+                      n = sum(n))) %>%
+  select(-n)
+
+scabies_location_data <- skin_exam_data_wd %>%
+  filter(skin_exam_flag == 1) %>%
+  #filter(f2_present_fct == 'yes') %>%
+  dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct,
+                skin_exam_age_group,
+                skin_exam_scabies_scratching_24_fct,
+                skin_exam_scabies_typical_lesions_fct,
+                skin_exam_scabies_lesions_more_10_fct,
+                skin_exam_scabies_skin_infection_fct,
+                skin_exam_scabies_finished_fct
+  )
+
+scabies_location_data %>% 
+  dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>% 
+  group_by(skin_exam_area_council_fct, skin_exam_village_fct) %>% 
+  mutate(total=sum(n()))
+
+
+scabies_location_data %>% 
+  dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>% 
+  count(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_scabies_scratching_24_fct) %>% filter(skin_exam_scabies_scratching_24_fct=='yes') %>% 
+  left_join(scabies_location_data %>% 
+              dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>% 
+              group_by(skin_exam_area_council_fct, skin_exam_village_fct) %>% 
+              summarise(total=sum(n())), by=c('skin_exam_area_council_fct', 'skin_exam_village_fct')) %>% 
+  mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                       broom::tidy())) %>%
+  unnest(prop) %>% 
+  ggplot(aes(x=skin_exam_village_fct, y=estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.1) +
+  labs(y='Reported itching in last 24 hours') +
+  #theme_classic() +
+  facet_wrap(~skin_exam_area_council_fct, scales='free_x', nrow=1)
+####Break down by age group
+
+
+
+
+overall_prop_fn <- function() {
+  
+  overall_scabies_village_itching_propotions <- scabies_location_data %>% 
+    dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_scabies_scratching_24_fct ) %>% 
+    count(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_scabies_scratching_24_fct) %>% filter(skin_exam_scabies_scratching_24_fct=='yes') %>% 
+    full_join(scabies_location_data %>% 
+                dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_scabies_scratching_24_fct ) %>% 
+                group_by(skin_exam_area_council_fct, skin_exam_village_fct) %>% 
+                summarise(total=sum(n())), by=c('skin_exam_area_council_fct', 'skin_exam_village_fct')) %>% replace_na(list(n=0))
+  
+  a <- overall_scabies_village_itching_propotions %>% filter(n>0) %>% 
+    mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                         broom::tidy())) %>% 
+    unnest(prop) %>% dplyr::select(skin_exam_area_council_fct,skin_exam_village_fct, n, total, estimate, conf.low, conf.high)
+  
+  b <- overall_scabies_village_itching_propotions %>% filter(n==0) %>% dplyr::select(-skin_exam_scabies_scratching_24_fct)
+  
+  c <- a %>% bind_rows(b) %>% arrange(skin_exam_area_council_fct, skin_exam_village_fct) %>% replace_na(list(estimate=0, conf.low=0, conf.high=0))
+  
+  return(c)
+  
+}
+
+overall_scabies_village_proportion <- overall_prop_fn()
+
+
+
+overall_scabies_village_proportion %>% 
+  ggplot(aes(x=skin_exam_village_fct, y=estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.1) +
+  labs(y='Reported itching in last 24 hours') +
+  #theme_classic() +
+  facet_wrap(~skin_exam_area_council_fct, scales='free_x', nrow=1)
+
+
+####Break down by age group
+
+######################OVERALL- NO AGE GROUP
+all_population <- scabies_location_data %>%
+  dplyr::select(skin_exam_scabies_scratching_24_fct ) %>%
+  summarise(total=sum(n())) %>% 
+  mutate(skin_exam_area_council_fct='Overall')
+
+all_scabies_cases_population_merge <- scabies_location_data %>%
+  dplyr::select(skin_exam_scabies_scratching_24_fct ) %>%
+  count(skin_exam_scabies_scratching_24_fct) %>%
+  filter(skin_exam_scabies_scratching_24_fct=='yes') %>%
+  dplyr::select(-skin_exam_scabies_scratching_24_fct) %>%
+  mutate(skin_exam_area_council_fct='Overall') %>% 
+  full_join(all_population,by=c('skin_exam_area_council_fct')) %>%
+  replace_na(list(n=0))
+
+
+all_scabies_propotions <- all_scabies_cases_population_merge %>% filter(n>0) %>%
+  mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                       broom::tidy())) %>%
+  unnest(prop) %>% dplyr::select(skin_exam_area_council_fct, n, total, estimate, conf.low, conf.high)
+
+all_age_scabies_itching_propotions <- all_scabies_cases_population_merge %>% filter(n==0) %>%
+  bind_rows(all_scabies_propotions) %>% 
+  pivot_longer(-c(skin_exam_area_council_fct)) %>%
+  pivot_wider(names_from=c(name), values_from=value)
+
+
+######BY VILLAGE - AGE GROUP  
+village_age_population <- scabies_location_data %>% 
+  dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_age_group, skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>% 
+  group_by(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_age_group) %>% 
+  summarise(total=sum(n()))
+
+scabies_cases_population_merge <- scabies_location_data %>% 
+  dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>% 
+  count(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_age_group,skin_exam_scabies_scratching_24_fct) %>% 
+  filter(skin_exam_scabies_scratching_24_fct=='yes') %>% 
+  dplyr::select(-skin_exam_scabies_scratching_24_fct) %>% 
+  full_join(village_age_population,by=c('skin_exam_area_council_fct', 'skin_exam_village_fct', 'skin_exam_age_group')) %>% 
+  replace_na(list(n=0))
+
+
+scabies_propotions <- scabies_cases_population_merge %>% filter(n>0) %>% 
+  mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                       broom::tidy())) %>%
+  unnest(prop) %>% dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group, n, total, estimate, conf.low, conf.high)
+
+scabies_itching_propotions <- scabies_cases_population_merge %>% filter(n==0) %>% 
+  bind_rows(scabies_propotions) %>% arrange(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_age_group) %>% 
+  pivot_longer(-c(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group)) %>% 
+  pivot_wider(names_from=c(name, skin_exam_age_group), values_from=value)
+
+######ALL POPULATION - AGE GROUP
+all_age_population <- scabies_location_data %>%
+  dplyr::select(skin_exam_age_group, skin_exam_scabies_scratching_24_fct ) %>%
+  group_by(skin_exam_age_group) %>%
+  summarise(total=sum(n()))
+
+all_age_scabies_cases_population_merge <- scabies_location_data %>%
+  dplyr::select(skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>%
+  count(skin_exam_age_group,skin_exam_scabies_scratching_24_fct) %>%
+  filter(skin_exam_scabies_scratching_24_fct=='yes') %>%
+  dplyr::select(-skin_exam_scabies_scratching_24_fct) %>%
+  full_join(all_age_population,by=c('skin_exam_age_group')) %>%
+  replace_na(list(n=0))
+
+
+all_age_scabies_propotions <- scabies_cases_population_merge %>% filter(n>0) %>%
+  mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                       broom::tidy())) %>%
+  unnest(prop) %>% dplyr::select(skin_exam_age_group, n, total, estimate, conf.low, conf.high)
+
+all_age_scabies_itching_propotions <- all_age_scabies_cases_population_merge %>% filter(n==0) %>%
+  bind_rows(all_age_scabies_propotions) %>% arrange(skin_exam_age_group) %>%
+  pivot_longer(-c(skin_exam_age_group)) %>%
+  pivot_wider(names_from=c(name, skin_exam_age_group), values_from=value)
+
+
+glimpse(risk_factor_working_data)
+
+
+risk_factor_working_data %>% 
+  ggplot(aes(x=risk_factor_household_occupants)) +
+  geom_histogram() +
+  facet_wrap(~ risk_factor_area_council)
+
+risk_factor_working_data %>% ungroup() %>% 
+  summarise(mean_household_occupants=mean(risk_factor_household_occupants, na.rm=TRUE))
+
+
+risk_factor_working_data %>% ungroup() %>% 
+  group_by(risk_factor_area_council) %>% 
+  dplyr::summarise(
+    avg = mean(risk_factor_household_occupants,na.rm=TRUE),
+    lci = t.test(risk_factor_household_occupants, conf.level = 0.95)$conf.int[1],
+    uci = t.test(risk_factor_household_occupants, conf.level = 0.95)$conf.int[2]) %>% 
+  ungroup() %>% 
+  bind_rows(summarize(., region = "Overall Avg", 
+                      avg = sum(avg * n) / sum(n), 
+                      n = sum(n))) %>%
+  select(-n)
+
+scabies_location_data <- skin_exam_data_wd %>%
+  filter(skin_exam_flag == 1) %>%
+  #filter(f2_present_fct == 'yes') %>%
+  dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct,
+                skin_exam_age_group,
+                skin_exam_scabies_scratching_24_fct,
+                skin_exam_scabies_typical_lesions_fct,
+                skin_exam_scabies_lesions_more_10_fct,
+                skin_exam_scabies_skin_infection_fct,
+                skin_exam_scabies_finished_fct
+  )
+
+
+overall_prop_fn <- function() {
+  
+  overall_scabies_village_itching_propotions <- scabies_location_data %>% 
+    dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_scabies_scratching_24_fct ) %>% 
+    count(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_scabies_scratching_24_fct) %>% filter(skin_exam_scabies_scratching_24_fct=='yes') %>% 
+    full_join(scabies_location_data %>% 
+                dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_scabies_scratching_24_fct ) %>% 
+                group_by(skin_exam_area_council_fct, skin_exam_village_fct) %>% 
+                summarise(total=sum(n())), by=c('skin_exam_area_council_fct', 'skin_exam_village_fct')) %>% replace_na(list(n=0))
+  
+  a <- overall_scabies_village_itching_propotions %>% filter(n>0) %>% 
+    mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                         broom::tidy())) %>% 
+    unnest(prop) %>% dplyr::select(skin_exam_area_council_fct,skin_exam_village_fct, n, total, estimate, conf.low, conf.high)
+  
+  b <- overall_scabies_village_itching_propotions %>% filter(n==0) %>% dplyr::select(-skin_exam_scabies_scratching_24_fct)
+  
+  c <- a %>% bind_rows(b) %>% arrange(skin_exam_area_council_fct, skin_exam_village_fct) %>% replace_na(list(estimate=0, conf.low=0, conf.high=0))
+  
+  return(c)
+  
+}
+
+overall_scabies_village_proportion <- overall_prop_fn()
+
+
+
+overall_scabies_village_proportion %>% 
+  ggplot(aes(x=skin_exam_village_fct, y=estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.1) +
+  labs(y='Reported itching in last 24 hours') +
+  scale_y_continuous(labels = scales::percent) +
+  #theme_classic() +
+  facet_wrap(~skin_exam_area_council_fct, scales='free_x', nrow=1)
+
+
+####Break down by age group
+
+######################OVERALL- NO AGE GROUP
+all_population <- scabies_location_data %>%
+  dplyr::select(skin_exam_scabies_scratching_24_fct ) %>%
+  summarise(total=sum(n())) %>% 
+  mutate(skin_exam_area_council_fct='Overall')
+
+all_scabies_cases_population_merge <- scabies_location_data %>%
+  dplyr::select(skin_exam_scabies_scratching_24_fct ) %>%
+  count(skin_exam_scabies_scratching_24_fct) %>%
+  filter(skin_exam_scabies_scratching_24_fct=='yes') %>%
+  dplyr::select(-skin_exam_scabies_scratching_24_fct) %>%
+  mutate(skin_exam_area_council_fct='Overall') %>% 
+  full_join(all_population,by=c('skin_exam_area_council_fct')) %>%
+  replace_na(list(n=0))
+
+
+all_scabies_propotions <- all_scabies_cases_population_merge %>% filter(n>0) %>%
+  mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                       broom::tidy())) %>%
+  unnest(prop) %>% dplyr::select(skin_exam_area_council_fct, n, total, estimate, conf.low, conf.high)
+
+all_age_scabies_itching_propotions <- all_scabies_cases_population_merge %>% filter(n==0) %>%
+  bind_rows(all_scabies_propotions) %>% 
+  pivot_longer(-c(skin_exam_area_council_fct)) %>%
+  pivot_wider(names_from=c(name), values_from=value)
+
+
+######BY VILLAGE - AGE GROUP  
+village_age_population <- scabies_location_data %>% 
+  dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_age_group, skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>% 
+  group_by(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_age_group) %>% 
+  summarise(total=sum(n()))
+
+scabies_cases_population_merge <- scabies_location_data %>% 
+  dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>% 
+  count(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_age_group,skin_exam_scabies_scratching_24_fct) %>% 
+  filter(skin_exam_scabies_scratching_24_fct=='yes') %>% 
+  dplyr::select(-skin_exam_scabies_scratching_24_fct) %>% 
+  full_join(village_age_population,by=c('skin_exam_area_council_fct', 'skin_exam_village_fct', 'skin_exam_age_group')) %>% 
+  replace_na(list(n=0))
+
+
+scabies_propotions <- scabies_cases_population_merge %>% filter(n>0) %>% 
+  mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                       broom::tidy())) %>%
+  unnest(prop) %>% dplyr::select(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group, n, total, estimate, conf.low, conf.high)
+
+scabies_itching_propotions <- scabies_cases_population_merge %>% filter(n==0) %>% 
+  bind_rows(scabies_propotions) %>% arrange(skin_exam_area_council_fct, skin_exam_village_fct,skin_exam_age_group) %>% 
+  pivot_longer(-c(skin_exam_area_council_fct, skin_exam_village_fct, skin_exam_age_group)) %>% 
+  pivot_wider(names_from=c(name, skin_exam_age_group), values_from=value)
+
+######ALL POPULATION - AGE GROUP
+all_age_population <- scabies_location_data %>%
+  dplyr::select(skin_exam_age_group, skin_exam_scabies_scratching_24_fct ) %>%
+  group_by(skin_exam_age_group) %>%
+  summarise(total=sum(n()))
+
+all_age_scabies_cases_population_merge <- scabies_location_data %>%
+  dplyr::select(skin_exam_age_group,skin_exam_scabies_scratching_24_fct ) %>%
+  count(skin_exam_age_group,skin_exam_scabies_scratching_24_fct) %>%
+  filter(skin_exam_scabies_scratching_24_fct=='yes') %>%
+  dplyr::select(-skin_exam_scabies_scratching_24_fct) %>%
+  full_join(all_age_population,by=c('skin_exam_age_group')) %>%
+  replace_na(list(n=0))
+
+
+all_age_scabies_propotions <- scabies_cases_population_merge %>% filter(n>0) %>%
+  mutate(prop = map2(n, total, ~ prop.test(.x, .y, conf.level=0.95) %>%
+                       broom::tidy())) %>%
+  unnest(prop) %>% dplyr::select(skin_exam_age_group, n, total, estimate, conf.low, conf.high)
+
+all_age_scabies_itching_propotions <- all_age_scabies_cases_population_merge %>% filter(n==0) %>%
+  bind_rows(all_age_scabies_propotions) %>% arrange(skin_exam_age_group) %>%
+  pivot_longer(-c(skin_exam_age_group)) %>%
+  pivot_wider(names_from=c(name, skin_exam_age_group), values_from=value)
+
+
+
+
+
+
+
+
+
+

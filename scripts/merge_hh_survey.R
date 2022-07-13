@@ -4,7 +4,7 @@
 
 
 
-(risk_factor <- risk_factor_working_data %>% select(area_council_fct=risk_factor_area_council_fct, 
+(risk_factor <- risk_factor_working_data %>% dplyr::select(area_council_fct=risk_factor_area_council_fct, 
                                                    village_fct=risk_factor_village_fct, 
                                                    participant_name=risk_factor_participant_name, 
                                                    mda_code, 
@@ -14,12 +14,12 @@
                                              TRUE ~ as.character(area_council_fct)))) %>% 
   mutate(key=paste(area_council_fct, village_fct, province, book,page,household_id, sep='_')) %>% 
   group_by(key) %>% 
-  mutate(count=n()) %>% filter(count==1) %>% 
+  mutate(count=n()) %>% 
+  filter(count==1) %>% 
   mutate(risk_factor_flag=1)
 )
 
 risk_factor_hh <- risk_factor %>% group_by(area_council_fct, village_fct) %>% summarise(risk_factor_hh=n())
-
 
 (form2 <- form2_working_data %>% select(area_council_fct=f2_area_council_fct,
                                        village_fct=f2_village_fct, 

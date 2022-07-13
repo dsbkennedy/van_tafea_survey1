@@ -1,5 +1,19 @@
 # Analysis ----------------------------------------------------------------
 
+
+---
+  title: "Tafea: Survey round 1"
+format:
+  docx:
+  toc: true
+number-sections: true
+reference-doc: custom-reference-doc.docx
+execute:
+  echo: false
+warning: false
+editor: visual
+---
+  
 theme_gtsummary_journal(journal = "jama")
 theme_gtsummary_compact()
 

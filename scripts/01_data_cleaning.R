@@ -96,7 +96,7 @@ risk_factor_raw <- read_xlsx(risk_factor_raw)
     ) %>% 
     mutate(mda_code_risk_factor=mda_code) %>% 
     tidyr::separate(mda_code, into=c('province', 'book', 'page', 'line')) %>% 
-    mutate(area_council_fct=factor(case_when(area_council_fct=='south_west_t' ~ 'south_west_tanna', 
+    mutate(area_council_fct=factor(case_when(village_fct=='karimasanga' ~ 'south_west_tanna', 
                                              TRUE ~ as.character(area_council_fct)))) %>% 
     mutate(key=paste(area_council_fct, village_fct, province, book,page,household_id, sep='_')) %>% 
     #rename(mda_code=mda_code_copy) %>% 
@@ -112,6 +112,9 @@ return(risk_factor_processed)
 }
 
 risk_factor_working_data <- risk_factor_processing_fn() %>% clean_data()
+
+saveRDS(risk_factor_working_data, here('outputs', 'risk_factor_data.Rds'))
+
 
 # Skin exam ---------------------------------------------------------------
 
@@ -194,12 +197,14 @@ skin_exam_update_name_mda_code <- readRDS(here('data', 'robjects', 'skin_exam_up
       skin_exam_scabies_typical_lesions_fct=='no' ~ 'no scabies lesions observed', 
       #is.na(skin_exam_scabies_skin_infection_fct) ~ 'question not relevant', 
       TRUE ~ as.character(skin_exam_scabies_skin_infection_fct)), levels=c('yes', 'no', 'no scabies lesions observed')))  %>% 
+    ################YAWS
     mutate(skin_exam_yaws_saw_lesion_fct=factor(case_when(skin_exam_yaws_self_report_fct=='yes' ~ NA_character_,
-                                                          TRUE ~as.character(skin_exam_yaws_saw_lesion_fct)), levels=c('yes', 'no'))) %>% 
+                                                          TRUE ~as.character(skin_exam_yaws_saw_lesion_fct)), levels=c('yes', 'no'))) %>%
     mutate(skin_exam_yaws_dpp_result_fct=factor(skin_exam_yaws_dpp_result_fct, levels=c('positive_active_yaws',
                                                                                         'old_treated_yaws', 
                                                                                         'negative_no_yaws', 
                                                                                         'false_positive'))) %>% 
+    ###########LEPROSY
     mutate(skin_exam_leprosy_saw_lesion_fct = case_when(skin_exam_leprosy_self_report_fct=='yes' ~ 'leprosy lesion self-reported',
                                                         skin_exam_leprosy_saw_lesion_fct=='yes' ~ 'yes', 
                                                         skin_exam_leprosy_suspected_fct=='yes' ~ 'yes',
@@ -210,6 +215,7 @@ skin_exam_update_name_mda_code <- readRDS(here('data', 'robjects', 'skin_exam_up
                                                           'no leprosy lesion detected', 
                                                           as.character(skin_exam_leprosy_suspected_fct)))) %>% 
     mutate(skin_exam_leprosy_suspected_fct=factor(skin_exam_leprosy_suspected_fct, levels=c('yes', 'no', 'no leprosy lesion detected'))) %>% 
+    ############SSD
     mutate(across(c(skin_exam_ssd_none_fct,
                     skin_exam_ssd_abscess_boil_fct,
                     skin_exam_ssd_cellulitis_fct ,
@@ -225,7 +231,7 @@ return(skin_exam_processed)
 }
 
 skin_exam_working_data <- skin_exam_processing_fn() 
-saveRDS(skin_exam_working_data, here('skin_exam_data.Rds'))
+saveRDS(skin_exam_working_data, here('outputs', 'skin_exam_data.Rds'))
 
 # DBS ---------------------------------------------------------------------
 
@@ -385,11 +391,11 @@ form2_combine_fill <- form2_1_processed %>%
   #                                                           TRUE ~ as.character(.)), 
   #                                                 levels=c('yes', 'no', 'consent not obtained')))) %>% 
  # mutate(f2_age_group = age_group_fn(f2_age)) %>% 
-  mutate(f2_age_group=factor(case_when(f2_age ==0 ~ '<1 YOA',
-                                       f2_age %in% c(1:4) ~ 'PSAC 1-4',
-                                       f2_age %in% c(5:14) ~ 'SAC 5-14',
-                                       f2_age >=15 ~ 'ADULTS >15', 
-                                       TRUE ~ 'AGE MISSING'), levels=c('<1 YOA','PSAC 1-4', 'SAC 5-14','ADULTS >15', 'AGE MISSING'))) %>% 
+  # mutate(f2_age_group=factor(case_when(f2_age ==0 ~ '<1 YOA',
+  #                                      f2_age %in% c(1:4) ~ 'PSAC 1-4',
+  #                                      f2_age %in% c(5:14) ~ 'SAC 5-14',
+  #                                      f2_age >=15 ~ 'ADULTS >15', 
+  #                                      TRUE ~ 'AGE MISSING'), levels=c('<1 YOA','PSAC 1-4', 'SAC 5-14','ADULTS >15', 'AGE MISSING'))) %>% 
   # mutate(f2_sex_fct=case_when(!is.na(f2_sex_fct) ~ 'Sex missing', 
   #                             TRUE ~ f2_sex_fct)) %>% 
   #mutate(f2_sex_fct=fct_explicit_na(f2_sex_fct, 'Sex missing')) %>% 
@@ -411,15 +417,15 @@ form2_combine_fill <- form2_1_processed %>%
   mutate(f2_ivm_any_fct = case_when((is.na(f2_ivm_any_fct) & f2_flag==1) ~ 'no', 
                                     TRUE ~ f2_ivm_any_fct)) %>% 
   mutate(across(f2_azith_any_fct:f2_ivm_any_fct, factor, levels=c('yes', 'no'))) %>% 
-  mutate(f2_pm_any_fct = case_when(f2_pm_2m_fct == 'yes' ~ 'yes',
+  mutate(f2_pm_any_fct = factor(case_when(f2_pm_2m_fct == 'yes' ~ 'yes',
                                    f2_pm_2m_12yr_fct == 'yes' ~ 'yes',
-                                   f2_pm_other_fct == 'yes' ~ 'yes')) %>% 
-  mutate(f2_pm_any_fct = case_when(f2_ivm_any_fct=='yes' & f2_pm_any_fct=='yes' ~ 'yes-received ivermectin',
-                                   is.na(f2_pm_any_fct) & (f2_flag==1 & f2_ivm_any_fct=='no') ~ 'no',
-                                   f2_ivm_any_fct=='yes' & f2_pm_any_fct=='no' ~ 'no-received ivermectin',
-                                   TRUE ~ f2_pm_any_fct)) %>% 
-  mutate(f2_pm_any_fct=factor(f2_pm_any_fct, levels=c('yes','yes-received ivermectin',
-                                                      'no-received ivermectin', 'no')))
+                                   f2_pm_other_fct == 'yes' ~ 'yes'), levels=c('yes', 'no')))
+  # mutate(f2_pm_any_fct = case_when(f2_ivm_any_fct=='yes' & f2_pm_any_fct=='yes' ~ 'yes-received ivermectin',
+  #                                  is.na(f2_pm_any_fct) & (f2_flag==1 & f2_ivm_any_fct=='no') ~ 'no',
+  #                                  f2_ivm_any_fct=='yes' & f2_pm_any_fct=='no' ~ 'no-received ivermectin',
+  #                                  TRUE ~ f2_pm_any_fct)) %>% 
+  # mutate(f2_pm_any_fct=factor(f2_pm_any_fct, levels=c('yes','yes-received ivermectin',
+  #                                                     'no-received ivermectin', 'no')))
 
 correct_names_fn <- function() {
   name_cleaning <- form2_combine_fill %>% 
@@ -495,7 +501,6 @@ return(form2_1_processed_upd)
 
 form2_working_data <- form2_processing_fn() %>% ungroup()
 
-saveRDS(form2_working_data, here('form2_working_data.Rds'))
 
 
 # Form 3 ------------------------------------------------------------------
@@ -787,6 +792,8 @@ correct_skin_data_fn <- function() {
 
 form2_skin_exam_merged <- form2_working_data %>% 
   full_join(skin_exam_working_data, by=c('mda_code', 
+                                         #'f2_sex_fct' = 'skin_exam_sex_fct',
+                                         #'f2_sex_fct' = 'skin_exam_sex_fct',
                                  #'f2_participant_name' = 'skin_exam_participant_name',
             #'f2_sex_fct' = 'skin_exam_sex_fct',
             'f2_village_fct' = 'skin_exam_village_fct'))
@@ -906,23 +913,81 @@ mda_id_sample_merge <- form3.1_working_data %>%
 
 # Cleaning analysis dataset -----------------------------------------------
 
-
-
 analysis_data <- merged_data_all 
   
-saveRDS(analysis_data, here('analysis_data.Rds'))
+saveRDS(analysis_data, here('outputs', 'analysis_data.Rds'))
   
- 
 
-# x %>% tabyl( skin_exam_yaws_suspected_fct, skin_exam_yaws_saw_lesion_fct)
-# 
-# x <- merged_data_all %>% filter(skin_exam_yaws_dpp_result_fct %in% c('positive_active_yaws', 'negative_no_yaws'))
-# 
-# table(skin_exam_working_data$skin_exam_yaws_village_arrive_6m_fct)
-#   # mutate(skin_exam_scabies_typical_lesions_fct = ifelse(skin_exam_scabies_scratching_24_fct=='no', 
-#   #                                                       'no scabies lesions detected',
-#   #                                                       skin_exam_scabies_typical_lesions_fct ))
-#   
-#                                     
-# mutate(Revenue = replace(Revenue, is.na(Revenue) & Date <= max.date, 0))
+
+# Clean individual working data forms based on analysis data --------------
+
+clean_form2 <- function() {
+  f2_present_update <- analysis_data %>% filter(is.na(f2_present_fct) & f2_flag==1) %>% 
+    mutate(f2_present_fct_update=factor(case_when(f10_flag==1 | f11_results_flag==1 | skin_exam_flag==1 ~ 'yes', 
+                                                  TRUE ~ as.character(f2_present_fct)), 
+                                        levels=c('yes', 'no'))) %>% 
+    dplyr::select(mda_code, present_update = f2_present_fct_update) %>% 
+    filter(!is.na(present_update))
+  
+  f2_consent_update <- analysis_data %>% filter((is.na(f2_consent_fct) | f2_consent_fct=='no') & f2_flag==1) %>% 
+    mutate(f2_consent_fct_update=factor(case_when(f10_flag==1 | f11_results_flag==1 | skin_exam_flag==1 ~ 'yes', 
+                                                  TRUE ~ as.character(f2_consent_fct)), 
+                                        levels=c('yes', 'no'))) %>% 
+    dplyr::select(mda_code, consent_update = f2_consent_fct_update) %>% 
+    filter(!is.na(consent_update))
+  
+  f2_questionnaire_update <- analysis_data %>% 
+    filter((is.na(f2_questionnaire_fct) | f2_questionnaire_fct=='no') & f2_flag==1) %>% 
+    mutate(f2_questionnaire_fct_update=factor(case_when(risk_factor_flag==1 ~ 'yes', 
+                                                        TRUE ~ as.character(f2_questionnaire_fct)), 
+                                              levels=c('yes', 'no'))) %>% 
+    dplyr::select(mda_code, f2_questionnaire_fct) %>% 
+    filter(!is.na(f2_questionnaire_fct))
+  #### Nothing changes, recode missings as missing
+  
+  
+  form2_working_data_update <- form2_working_data %>% 
+    mutate(f2_sex_fct=factor(case_when(f2_participant_name=='masaka_natonga' & f2_age==53 ~ 'male', 
+                                       TRUE ~ as.character(f2_sex_fct)), 
+                             levels = c("male", "female"))) %>% 
+    mutate(f2_age = case_when(f2_participant_name=='sterol_ansen' & f2_sex_fct=='male' ~ 3,
+                              f2_participant_name=='nawau_joseph' & f2_sex_fct=='male' ~ 30,
+                              f2_participant_name=='naiwa_roroveka' & f2_sex_fct=='male' ~ 49,
+                              TRUE ~ f2_age)) %>% 
+    mutate(f2_age_group=factor(case_when(f2_age ==0 ~ '<1 YOA',
+                                         f2_age %in% c(1:4) ~ 'PSAC 1-4',
+                                         f2_age %in% c(5:14) ~ 'SAC 5-14',
+                                         f2_age >=15 ~ 'ADULTS >15', 
+                                         TRUE ~ 'AGE MISSING'), levels=c('<1 YOA','PSAC 1-4', 'SAC 5-14','ADULTS >15', 'AGE MISSING'))) %>% 
+    left_join(f2_present_update, by='mda_code') %>% 
+    mutate(f2_present_updated=factor(case_when(present_update=='yes' ~ 'yes', 
+                                        TRUE ~ as.character(f2_present_fct)),
+                                     levels=c('yes', 'no')))  %>% 
+    #mutate(f2_present_updated=coalesce(f2_present_fct_update, f2_present_fct))  %>% 
+    mutate(f2_present_updated=fct_explicit_na(f2_present_updated, na_level = "Missing")) %>% 
+    left_join(f2_consent_update, by='mda_code') %>% 
+    mutate(f2_consent_updated=factor(case_when(consent_update=='yes' ~ 'yes', 
+                                        TRUE ~ as.character(f2_consent_fct)), 
+                                     levels=c('yes', 'no'))) 
+    #mutate(f2_consent_updated=fct_explicit_na(f2_consent_updated, na_level = "Missing")) %>% 
+    #mutate(f2_questionnaire_fct=fct_explicit_na(f2_questionnaire_fct, na_level = "Missing"))
+  return(form2_working_data_update)
+}
+
+form2_working_data_updated <- clean_form2()
+
+saveRDS(form2_working_data_updated, here('outputs', 'form2_working_data.Rds'))
+
+form2_skin_exam_merged <- form2_working_data %>% 
+  full_join(skin_exam_working_data, by=c('mda_code', 
+                                         'f2_sex_fct' = 'skin_exam_sex_fct', 
+                                         'f2_age' = 'skin_exam_age'))
+                                         #'f2_participant_name' = 'skin_exam_participant_name',
+                                         #'f2_sex_fct' = 'skin_exam_sex_fct',))
+
+
+
+
+
+
 
