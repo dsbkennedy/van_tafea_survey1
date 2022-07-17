@@ -422,7 +422,8 @@ scabies_location_data %>%
   geom_point() +
   geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=.1) +
   labs(y='Reported itching in last 24 hours') +
-  #theme_classic() +
+  theme_classic() +
+  theme(text = element_text(size = 20)) +
   facet_wrap(~skin_exam_area_council_fct, scales='free_x', nrow=1)
 ####Break down by age group
 
