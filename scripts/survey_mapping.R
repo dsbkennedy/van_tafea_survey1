@@ -415,15 +415,12 @@ counties_spec <- tafea_shp %>%
                            adm2_en=='middle_bush_tanna' ~ 0.2, 
                            adm2_en=='north_erromango' ~ 0.3, 
                            adm2_en=='south_erromango' ~ 0.3, 
-                           
-                           
                            adm2_en=='whitesands' ~ 0.18, 
                            TRUE ~ 0),
          y_nudge=case_when(adm2_en=='aniwa' ~ 0.07, 
                            adm2_en=='futuna' ~ 0.07, 
                            adm2_en=='north_tanna' ~ 0.1, 
                            adm2_en=='south_tanna' ~ -0.04, 
-                           
                            adm2_en=='south_west_tanna' ~ -0.1, 
                            adm2_en=='middle_bush_tanna' ~ 0.05, 
                            TRUE ~ 0)) %>% 
@@ -454,7 +451,11 @@ survey_villages <- readxl::read_xlsx(here('/Users/DK_kirby/Library/CloudStorage/
 original_survey_villages_coord <- survey_villages %>% left_join(tafea_coord, 
                                                                 by=c('acname' = 'ac_name',
                                                                      'vname' = 'village_area_name')) %>% 
-  st_as_sf()
+  st_as_sf() %>% 
+  mutate(x_nudge=case_when(acname=='aneityum' ~ 0.3,
+                           TRUE ~ 0),
+         y_nudge=case_when(acname=='aneityum' ~ 0.3,
+                           TRUE ~ 0))
 
 
 (survey_villages_selected_map <- ggplot() +
@@ -467,8 +468,8 @@ original_survey_villages_coord <- survey_villages %>% left_join(tafea_coord,
             nudge_y = counties_spec$y_nudge) +
   geom_sf(data=original_survey_villages_coord) +
   geom_sf_label_repel(data=original_survey_villages_coord, 
-                      aes(label = vname), force = 40, nudge_x = -0.45, seed = 10, size=6) +
-  labs(title='Survey villages pre-selected') +
+                      aes(label = vname), force = 40,nudge_x = counties_spec$x_nudge,
+                      nudge_y = counties_spec$y_nudge, seed = 10, size=6) +
   ggsn::north(tafea_shp) +
   ggsn::scalebar(tafea_shp, dist = 25, dist_unit = "km",location='bottomleft',
                  transform = TRUE, model = "WGS84") +

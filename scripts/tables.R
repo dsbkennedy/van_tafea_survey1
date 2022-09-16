@@ -1,3 +1,5 @@
+
+
 scabies_data <- skin_exam_data_wd %>%
   filter(skin_exam_flag == 1) %>%
   #filter(f2_present_fct == 'yes') %>%
@@ -9,7 +11,6 @@ scabies_data <- skin_exam_data_wd %>%
     skin_exam_scabies_skin_infection_fct,
     skin_exam_scabies_finished_fct
   )
-
 
 scabies_data %>% 
   count(skin_exam_age_group, skin_exam_scabies_scratching_24_fct) %>% 
@@ -356,7 +357,7 @@ sth_result_table_fn <- function() {
   )
   
   (sth_result_graph <- sth_result_data %>% 
-      count(,pathogen,diag_method,result) %>% 
+      count(pathogen,diag_method,result) %>% 
       pivot_wider(names_from=result, values_from=n) %>% 
       dplyr::select(-sample_not_available) %>% 
       mutate(total=neg+pos) %>% 
@@ -443,5 +444,74 @@ imap(scabies_data, skin_exam_age_group)
 
 
 
-lapply(scabies_questions, summary_stats)
 
+# Summary of data from people not included in the survey but livin --------
+
+mda_survey_raw <-
+  read_csv(here('data', 'input', 'mda_survey_villages.csv'))
+
+mda_survey_test <- mda_survey_raw %>%
+  clean_data() %>%
+  mutate(total_people = m + f) %>%
+  mutate(azith_total = dplyr::select(., contains("azith")) %>%
+           rowSums()) %>%
+  mutate(alb_total = dplyr::select(., contains("alb")) %>%
+           rowSums()) %>%
+  mutate(ivm_total = dplyr::select(., contains("ivm")) %>%
+           rowSums()) %>%
+  dplyr::select(
+    area_council,
+    village,
+    total_people,
+    leprosy = suspected_leprosy_y_n,
+    yaws = saspekted_yaws_soa_y_n,
+    severe_skin_disease = severe_skin_disease_y_n,
+    azith_total,
+    alb_total,
+    ivm_total
+  ) %>%
+  pivot_longer(-c(area_council, village, total_people))
+
+
+prop_valid <- mda_survey_test %>% filter(value > 0) %>%
+  mutate(prop = map2(
+    value,
+    total_people,
+    ~ prop.test(.x, .y, conf.level = 0.95) %>%
+      broom::tidy()
+  )) %>%
+  unnest(prop)
+
+prop_zero <- mda_survey_test %>% filter(value == 0)
+
+(
+  all_estimate <- prop_valid %>%
+    bind_rows(prop_zero) %>%
+    arrange(area_council, village, name) %>%
+    dplyr::select(
+      area_council,
+      village,
+      name,
+      total_people,
+      value,
+      estimate,
+      conf.low,
+      conf.high
+    ) %>%
+    mutate(count_stat = paste(value, total_people, sep = '/')) %>%
+    mutate(
+      estimate = estimate * 100,
+      conf.low = conf.low * 100,
+      conf.high = conf.high * 100
+    ) %>%
+    mutate(across(6:8, round, 2)) %>%
+    mutate(prop_stat = paste0(
+      estimate, ' (', conf.low, '-', conf.high, ')'
+    )) %>%
+    dplyr::select(area_council, village, name, count_stat, prop_stat)  %>%
+    mutate(count_stat=paste0("'", count_stat)) %>% 
+    pivot_wider(
+      names_from = name,
+      values_from = c('count_stat', 'prop_stat')
+    )
+)

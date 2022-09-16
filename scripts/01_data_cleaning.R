@@ -569,7 +569,7 @@ names(form3_2_processed)
 return(form3_1_processed)
 }
 
-form3_working_data <- form3_processing_fn() %>% mutate(f2_flag=1)
+form3_working_data <- form3_processing_fn() 
 
 # Form 3.1 ----------------------------------------------------------------
 
@@ -792,11 +792,8 @@ correct_skin_data_fn <- function() {
 
 form2_skin_exam_merged <- form2_working_data %>% 
   full_join(skin_exam_working_data, by=c('mda_code', 
-                                         #'f2_sex_fct' = 'skin_exam_sex_fct',
-                                         #'f2_sex_fct' = 'skin_exam_sex_fct',
-                                 #'f2_participant_name' = 'skin_exam_participant_name',
-            #'f2_sex_fct' = 'skin_exam_sex_fct',
-            'f2_village_fct' = 'skin_exam_village_fct'))
+                                         'f2_age' = 'skin_exam_age',
+                                         'f2_sex_fct' = 'skin_exam_sex_fct'))
 
 ### 1192 matches, 302 in x, 18 in y 
 
@@ -888,7 +885,7 @@ merged_data_all <- form2_skin_exam_merged %>%
 #   left_join(form3_working_data, by=c('mda_code',
 #                                      'f2_participant_name' = 'f3_participant_name'))
   full_join(form3.1_working_data, by=c('mda_code')) %>%
-  # left_join(skin_exam_working_data, by=c('mda_code', 
+  full_join(skin_exam_working_data, by=c('mda_code')) %>%  
   #                                        'f2_participant_name' = 'participant_name')) %>% 
   # left_join(dbs_working_data, by=c('mda_code')) %>% 
   full_join(form10_working_data, by=c('mda_code')) %>%
@@ -943,9 +940,9 @@ clean_form2 <- function() {
                                               levels=c('yes', 'no'))) %>% 
     dplyr::select(mda_code, f2_questionnaire_fct) %>% 
     filter(!is.na(f2_questionnaire_fct))
+  
+  
   #### Nothing changes, recode missings as missing
-  
-  
   form2_working_data_update <- form2_working_data %>% 
     mutate(f2_sex_fct=factor(case_when(f2_participant_name=='masaka_natonga' & f2_age==53 ~ 'male', 
                                        TRUE ~ as.character(f2_sex_fct)), 
