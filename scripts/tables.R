@@ -1,4 +1,6 @@
+library(tidyverse)
 
+skin_exam_data_wd <- readRDS("~/Library/CloudStorage/OneDrive-UNSW/analysis/van_tafea_survey1/outputs/skin_exam_data.Rds")
 
 scabies_data <- skin_exam_data_wd %>%
   filter(skin_exam_flag == 1) %>%
@@ -154,13 +156,11 @@ skin_exam_table <- skin_exam_summary_table_fn()
 write.csv(skin_exam_table, here('data', 'output', 'skin_exam_table.csv'))
 
 
+# Form 2 table ------------------------------------------------------------
 
-
-form2_table
-
-
+tar_load(form2_working_data_update)
 form2_summary_table_fn <- function() {
-form2_results_results_age_group_tbl <- form2_working_data_wd %>%
+form2_results_results_age_group_tbl <- form2_working_data_update %>%
   dplyr::select(
     f2_sex_fct,
     f2_age_group,
@@ -195,7 +195,7 @@ form2_results_results_age_group_tbl <- form2_working_data_wd %>%
   arrange(question, response)
 
 
-form2_results_tbl <- form2_working_data_wd %>%
+form2_results_tbl <- form2_working_data_update %>%
   mutate(f2_age_group='OVERALL') %>% 
   dplyr::select(
     f2_sex_fct,
@@ -241,8 +241,9 @@ form2_table <- form2_summary_table_fn()
 
 write.csv(form2_table, here('data', 'output', 'form2_table.csv'))
 
+tar_load(analysis_data)
 tx_coverage_fn <- function() {
-  overall_denominator <- analysis_data_wd %>% 
+  overall_denominator <- analysis_data %>% 
     filter(f2_flag==1) %>% 
     filter(!is.na(f2_village_fct)) %>% 
     mutate(alb_ivm_denom=case_when(f2_age>=2 ~ 1, TRUE ~ 0)) %>% 
@@ -250,7 +251,7 @@ tx_coverage_fn <- function() {
               alb_ivm_denom=sum(alb_ivm_denom, na.rm=TRUE)) %>% 
     mutate(location='overall')
   
-  village_denominator <- analysis_data_wd %>% 
+  village_denominator <- analysis_data %>% 
     filter(f2_flag==1) %>% 
     filter(!is.na(f2_village_fct)) %>% 
     mutate(alb_ivm_denom=case_when(f2_age>=2 ~ 1, TRUE ~ 0)) %>% 
@@ -264,7 +265,7 @@ tx_coverage_fn <- function() {
   
   combined_denominators <- overall_denominator %>% bind_rows(village_denominator) %>% ungroup()
   
-  overall_tx_counts <- analysis_data_wd %>%   
+  overall_tx_counts <- analysis_data %>%   
     filter(f2_flag==1) %>% 
     filter(!is.na(f2_village_fct)) %>% 
     dplyr::select(mda_code,f2_azith_any_fct,f2_alb_any_fct,f2_ivm_any_fct, f2_pm_any_fct) %>% 
@@ -275,7 +276,7 @@ tx_coverage_fn <- function() {
     mutate(location='overall') %>% 
     pivot_wider(names_from=name, values_from=tx)
   
-  village_tx_counts <- analysis_data_wd %>%   filter(f2_flag==1) %>% 
+  village_tx_counts <- analysis_data %>%   filter(f2_flag==1) %>% 
     filter(!is.na(f2_village_fct)) %>% 
     dplyr::select(f2_village_fct,f2_azith_any_fct,f2_alb_any_fct,f2_ivm_any_fct, f2_pm_any_fct) %>% 
     pivot_longer(-c(f2_village_fct)) %>% mutate(treat_flag=case_when(value=='yes' ~ 1, 
@@ -339,6 +340,32 @@ write.csv(tx_coverage_tbl, here('data', 'output', 'tx_coverage_table.csv'))
 
 ######NEED TO ANALYSE DISCORDANT RESULTS
 
+(sth_result_data <- analysis_data %>% dplyr::select(f2_village_fct,
+                                                       f2_age, f2_sex_fct,f2_stool_sample_fct,
+                                                       qPCR_result_ascaris = qPCR_result_ascaris_ct1,f11_result_ascaris,
+                                                       qPCR_result_trichuris = qPCR_result_trichuris_ct1,f11_result_trichuris,
+                                                       qPCR_result_hookworm, f11_result_hookworm) %>% 
+    mutate(age_group_sth=factor(case_when(f2_age %in% c(1:4) ~ 'PSAC 1-4',
+                                          f2_age %in% c(5:14) ~ 'SAC 5-14',
+                                          f2_age >=15 ~ 'ADULTS >15'), levels=c('PSAC 1-4', 'SAC 5-14','ADULTS >15'))) %>% 
+    filter(!is.na(qPCR_result_ascaris)) %>% dplyr::select(-f2_age) %>% 
+    dplyr::select(f2_village_fct, f2_sex_fct, age_group_sth, contains('qPCR'), contains('f11')) %>% 
+    mutate(qPCR_result_any_sth = case_when(
+      if_any(starts_with('qPCR'), ~ . == 'pos') ~ "pos",
+      TRUE ~ "neg"
+    ),
+    f11_result_any_sth = case_when(
+      if_any(starts_with('f11'), ~ . == 'pos') ~ "pos",
+      if_any(starts_with('f11'), ~ . == 'no result') ~ "no result",
+      TRUE ~ "neg"
+    )) %>% 
+    pivot_longer(-c('f2_village_fct', 'f2_sex_fct', 'age_group_sth')) %>% 
+    mutate(diag_method=str_extract(string = name, pattern = "[^_]+")) %>% 
+    mutate(diag_method=factor(diag_method, levels=c('f11', 'qPCR'), labels=c('Sodium nitrate flotation', 'qPCR'))) %>% 
+    mutate(pathogen=str_extract(string = name, pattern = "[^_]+$")) %>% 
+    mutate(pathogen=factor(pathogen, levels=c('ascaris', 'trichuris', 'hookworm', 'sth'))) %>% 
+    dplyr::select(f2_village_fct, f2_sex_fct, age_group_sth, pathogen,diag_method,result=value)
+)
 
 sth_result_table_fn <- function() {
   (sth_result_age_group_graph <- sth_result_data %>% 
@@ -378,42 +405,39 @@ sth_result_table_fn <- function() {
 sth_table <- sth_result_table_fn()
 
 
-(sth_result_data <- analysis_data_wd %>% dplyr::select(f2_village_fct,
-                                                       f2_age, f2_sex_fct,f2_stool_sample_fct,
-                                                       qPCR_result_ascaris = qPCR_result_ascaris_ct1,f11_result_ascaris,
-                                                       qPCR_result_trichuris = qPCR_result_trichuris_ct1,f11_result_trichuris,
-                                                       qPCR_result_hookworm, f11_result_hookworm) %>% 
-    mutate(age_group_sth=factor(case_when(f2_age %in% c(1:4) ~ 'PSAC 1-4',
-                                          f2_age %in% c(5:14) ~ 'SAC 5-14',
-                                          f2_age >=15 ~ 'ADULTS >15'), levels=c('PSAC 1-4', 'SAC 5-14','ADULTS >15'))) %>% 
-    filter(!is.na(qPCR_result_ascaris)) %>% dplyr::select(-f2_age) %>% 
-    dplyr::select(f2_village_fct, f2_sex_fct, age_group_sth, contains('qPCR'), contains('f11')) %>% 
-    mutate(id=row_number()) %>% 
-    mutate(qPCR_result_any_sth = case_when(
-      if_any(starts_with('qPCR'), ~ . == 'pos') ~ "pos",
-      TRUE ~ "neg"
-    ),
-    f11_result_any_sth = case_when(
-      if_any(starts_with('f11'), ~ . == 'pos') ~ "pos",
-      if_any(starts_with('f11'), ~ . == 'no result') ~ "no result",
-      TRUE ~ "neg"
-    )) %>% 
-    pivot_longer(-c('id', 'f2_village_fct', 'f2_sex_fct', 'age_group_sth')) %>% 
-    mutate(diag_method=str_extract(string = name, pattern = "[^_]+")) %>% 
-    mutate(diag_method=factor(diag_method, levels=c('f11', 'qPCR'), labels=c('Sodium nitrate flotation', 'qPCR'))) %>% 
-    mutate(pathogen=str_extract(string = name, pattern = "[^_]+$")) %>% 
-    mutate(pathogen=factor(pathogen, levels=c('ascaris', 'trichuris', 'hookworm', 'sth'))) %>% 
-    dplyr::select(id,f2_village_fct, f2_sex_fct, age_group_sth, pathogen,diag_method,result=value)
-)
-
-x <- sth_result_data %>% 
-  pivot_wider(names_from=c(age_group_sth, pathogen, diag_method), values_from=result)
-
-sth_result_data %>% 
-  count(age_group_sth,pathogen,diag_method,result) 
-pivot_wider(names_from=diag_method, values_from=n)
+# (sth_result_data <- analysis_data %>% dplyr::select(f2_village_fct,
+#                                                        f2_age, f2_sex_fct,f2_stool_sample_fct,
+#                                                        qPCR_result_ascaris = qPCR_result_ascaris_ct1,f11_result_ascaris,
+#                                                        qPCR_result_trichuris = qPCR_result_trichuris_ct1,f11_result_trichuris,
+#                                                        qPCR_result_hookworm, f11_result_hookworm) %>% 
+#     mutate(age_group_sth=factor(case_when(f2_age %in% c(1:4) ~ 'PSAC 1-4',
+#                                           f2_age %in% c(5:14) ~ 'SAC 5-14',
+#                                           f2_age >=15 ~ 'ADULTS >15'), levels=c('PSAC 1-4', 'SAC 5-14','ADULTS >15'))) %>% 
+#     filter(!is.na(qPCR_result_ascaris)) %>% dplyr::select(-f2_age) %>% 
+#     dplyr::select(f2_village_fct, f2_sex_fct, age_group_sth, contains('qPCR'), contains('f11')) %>% 
+#     mutate(id=row_number()) %>% 
+#     mutate(qPCR_result_any_sth = case_when(
+#       if_any(starts_with('qPCR'), ~ . == 'pos') ~ "pos",
+#       TRUE ~ "neg"
+#     ),
+#     f11_result_any_sth = case_when(
+#       if_any(starts_with('f11'), ~ . == 'pos') ~ "pos",
+#       if_any(starts_with('f11'), ~ . == 'no result') ~ "no result",
+#       TRUE ~ "neg"
+#     )) %>% 
+#     pivot_longer(-c('id', 'f2_village_fct', 'f2_sex_fct', 'age_group_sth')) %>% 
+#     mutate(diag_method=str_extract(string = name, pattern = "[^_]+")) %>% 
+#     mutate(diag_method=factor(diag_method, levels=c('f11', 'qPCR'), labels=c('Sodium nitrate flotation', 'qPCR'))) %>% 
+#     mutate(pathogen=str_extract(string = name, pattern = "[^_]+$")) %>% 
+#     mutate(pathogen=factor(pathogen, levels=c('ascaris', 'trichuris', 'hookworm', 'sth'))) %>% 
+#     dplyr::select(id,f2_village_fct, f2_sex_fct, age_group_sth, pathogen,diag_method,result=value)
+# )
 
 
+# 
+# sth_result_data %>% 
+#   count(age_group_sth,pathogen,diag_method,result) 
+# pivot_wider(names_from=diag_method, values_from=n)
 
 
 
@@ -435,14 +459,6 @@ summary_stats_fn <- function(question_number) {
 }  
 
 summary_stats_fn('skin_exam_scabies_scratching_24_fct')
-
-map_dfr(scabies_questions, summary_stats_fn)
-
-
-foo <- function(x, y) count(tibble(x), !!y)
-imap(scabies_data, skin_exam_age_group)
-
-
 
 
 # Summary of data from people not included in the survey but livin --------

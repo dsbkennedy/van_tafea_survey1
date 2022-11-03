@@ -66,15 +66,6 @@ list(
     stool_sample_working_data %>%
       full_join(qpcr_results_working_data, by = c('mda_code'))
   ),
-  # tar_target(
-  #   form3.1_10_merged,
-  #   form3.1_10_merge_fn(form3.1_working_data, form10_working_data)
-  # ),
-  # tar_target(
-  #   form3.1_10_11_merged,
-  #   form3.1_10_merged %>%
-  #     full_join(form11_working_data, by = 'mda_code')
-  # ),
   tar_target(
     stool_receipt_qpcr_results_form11_merged,
     stool_results_processing_fn(stool_receipt_qpcr_results_merged,form11_working_data)
@@ -88,8 +79,6 @@ list(
                'f2_age' = 'skin_exam_age',
                'f2_sex_fct' = 'skin_exam_sex_fct')
       ) %>% 
-      #   left_join(form3_working_data, by=c('mda_code',
-      #                                      'f2_participant_name' = 'f3_participant_name'))
       full_join(form3.1_working_data, by=c('mda_code')) %>%
       #full_join(skin_exam_working_data, by=c('mda_code')) %>%  
       #                                        'f2_participant_name' = 'participant_name')) %>% 

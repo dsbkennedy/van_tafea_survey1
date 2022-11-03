@@ -340,7 +340,8 @@ ggplot(data=tafea_shp) +
 
 
 
-geopoints_summary <- skin_exam_geopoints_summary %>% full_join(risk_factor_geopoints_summary, by=c('skin_exam_area_council_fct' = 'risk_factor_area_council_fct', 
+geopoints_summary <- skin_exam_geopoints_summary %>% 
+  full_join(risk_factor_geopoints_summary, by=c('skin_exam_area_council_fct' = 'risk_factor_area_council_fct', 
                                                                               'skin_exam_village_fct' = 'risk_factor_village_fct'))
 
 
@@ -397,11 +398,25 @@ library(ggsflabel)
 library(rayshader)
 library(terra)
 library(linelist)
-
+library(janitor)
 van_shp <- list.files(here('data', 'input', 'shp'),
                       pattern=".shp$", full.names = T, recursive = T) 
 
 van_shp <- st_read(van_shp[[1]])
+
+
+select_sf <- van_shp %>% 
+  filter(ADM1_EN == 'Tafea')
+
+bounding_box = st_as_sfc(st_bbox(select_sf))
+
+(vanuatu_map <- ggplot(data=van_adm1_sf) +
+    geom_sf(aes(fill=province)) +
+    geom_sf(data = bounding_box, fill = NA, color = "red", size = 1.2) +
+    #theme_bw(base_family = "Roboto Condensed") +
+    theme_void() +
+    theme(legend.position = 'left', text = element_text(size = 40)) +
+    labs(fill='Province') )
 
 tafea_shp <- van_shp %>% filter(ADM1_EN=="Tafea") %>% clean_data()
 
@@ -412,9 +427,9 @@ counties_spec <- tafea_shp %>%
                            adm2_en=='west_tanna' ~ -0.17, 
                            adm2_en=='south_tanna' ~ 0.12, 
                            adm2_en=='south_west_tanna' ~ -0.2, 
-                           adm2_en=='middle_bush_tanna' ~ 0.2, 
-                           adm2_en=='north_erromango' ~ 0.3, 
-                           adm2_en=='south_erromango' ~ 0.3, 
+                           adm2_en=='middle_bush_tanna' ~ 0.4, 
+                           adm2_en=='north_erromango' ~ 0.4, 
+                           adm2_en=='south_erromango' ~ 0.4, 
                            adm2_en=='whitesands' ~ 0.18, 
                            TRUE ~ 0),
          y_nudge=case_when(adm2_en=='aniwa' ~ 0.07, 
@@ -426,7 +441,7 @@ counties_spec <- tafea_shp %>%
                            TRUE ~ 0)) %>% 
   mutate(adm2_en=str_replace(adm2_en, '_', ' '))
 
-coordinates <- readxl::read_xlsx(here("/Users/DK_kirby/Library/CloudStorage/OneDrive-UNSW/analysis/van_tafea_survey1/data/input/vanuatu_coordinates.xlsx"), 
+coordinates <- readxl::read_xlsx(here("data/input/vanuatu_coordinates.xlsx"), 
                                  sheet='2020 Consolidated Listing') %>% 
   clean_names() %>% 
   rename(latitude=lattitude)
@@ -466,13 +481,14 @@ original_survey_villages_coord <- survey_villages %>% left_join(tafea_coord,
             ,fontface = 'bold', 
             nudge_x = counties_spec$x_nudge,
             nudge_y = counties_spec$y_nudge) +
-  geom_sf(data=original_survey_villages_coord) +
-  geom_sf_label_repel(data=original_survey_villages_coord, 
-                      aes(label = vname), force = 40,nudge_x = counties_spec$x_nudge,
-                      nudge_y = counties_spec$y_nudge, seed = 10, size=6) +
+  geom_sf(data=original_survey_villages_coord, col='red', size=4) +
+  # geom_sf_label_repel(data=original_survey_villages_coord, 
+  #                     aes(label = vname), force = 40,nudge_x = counties_spec$x_nudge,
+  #                     nudge_y = counties_spec$y_nudge, seed = 10, size=6) +
   ggsn::north(tafea_shp) +
   ggsn::scalebar(tafea_shp, dist = 25, dist_unit = "km",location='bottomleft',
                  transform = TRUE, model = "WGS84") +
+    labs(title='Villages pre-selected') +
   theme_void()
 )
 
@@ -482,6 +498,8 @@ visited_survey_villages_coord <- readRDS( here('outputs', 'skin_exam_data.Rds'))
   mutate(skin_exam_area_council_fct=case_when(skin_exam_area_council_fct=='south_west_t'  ~ 'south_west_tanna', 
                                               skin_exam_area_council_fct=='middle_bush'  ~ 'middle_bush_tanna', 
                           TRUE ~ as.character(skin_exam_area_council_fct))) %>% 
+  # mutate(skin_exam_village_fct=case_when(skin_exam_village_fct=='karmisanga' ~ 'ikiti', 
+  #                                        TRUE ~ factor(skin_exam_village_fct))) %>% 
   left_join(tafea_coord, 
             by=c('skin_exam_area_council_fct' = 'ac_name',
                  'skin_exam_village_fct' = 'village_area_name')) %>% 
@@ -489,16 +507,16 @@ visited_survey_villages_coord <- readRDS( here('outputs', 'skin_exam_data.Rds'))
 
 (survey_villages_visited_map <- ggplot() +
   geom_sf(data=tafea_shp) +
-  geom_text(data=counties_spec, aes(x=lon, y=lat,label = adm2_en),
-            color = "#333333"
-            ,size = 8
-            ,fontface = 'bold', 
-            nudge_x = counties_spec$x_nudge,
-            nudge_y = counties_spec$y_nudge) +
-  geom_sf(data=visited_survey_villages_coord) +
-  geom_sf_label_repel(data=visited_survey_villages_coord, 
-                      aes(label = skin_exam_village_fct), force = 40, nudge_x = -0.15, seed = 10, size=6) +
-  labs(title='Villages visited') +
+  # geom_text(data=counties_spec, aes(x=lon, y=lat,label = adm2_en),
+  #           color = "#333333"
+  #           ,size = 8
+  #           ,fontface = 'bold', 
+  #           nudge_x = counties_spec$x_nudge,
+  #           nudge_y = counties_spec$y_nudge) +
+  geom_sf(data=visited_survey_villages_coord, col='dark green', size=4) +
+  # geom_sf_label_repel(data=visited_survey_villages_coord, 
+  #                     aes(label = skin_exam_village_fct), force = 40, nudge_x = -0.15, seed = 10, size=6) +
+  #labs(title='Villages visited') +
     ggsn::north(tafea_shp) +
     ggsn::scalebar(tafea_shp, dist = 25, dist_unit = "km",location='bottomleft',
                    transform = TRUE, model = "WGS84") +
