@@ -78,7 +78,7 @@ list(
         by = c('mda_code',
                'f2_age' = 'skin_exam_age',
                'f2_sex_fct' = 'skin_exam_sex_fct')
-      ) %>% 
+      ) %>%
       full_join(form3.1_working_data, by=c('mda_code')) %>%
       #full_join(skin_exam_working_data, by=c('mda_code')) %>%  
       #                                        'f2_participant_name' = 'participant_name')) %>% 
@@ -96,19 +96,19 @@ list(
   tar_target(
     analysis_data,
     form2_working_data_update %>%
-      full_join(
-        skin_exam_working_data,
-        by = c('mda_code',
-               'f2_age' = 'skin_exam_age',
-               'f2_sex_fct' = 'skin_exam_sex_fct')
-      ) %>% 
+      # full_join(
+      #   skin_exam_working_data,
+      #   by = c('mda_code',
+      #          'f2_age' = 'skin_exam_age',
+      #          'f2_sex_fct' = 'skin_exam_sex_fct')
+      # ) %>% 
       full_join(form3.1_working_data, by=c('mda_code')) %>%
       full_join(form10_working_data, by=c('mda_code')) %>%
       full_join(stool_sample_working_data, by=c('mda_code')) %>%
-      full_join(qpcr_results_working_data, by = c('mda_code')) %>% 
-      full_join(stool_sample_working_data, by = c('mda_code')) %>% 
-      full_join(qpcr_results_working_data, by = c('mda_code')) %>% 
-      full_join(stool_receipt_qpcr_results_form11_merged, by=c('mda_code')) %>% 
+      # full_join(qpcr_results_working_data, by = c('mda_code')) %>% 
+      # full_join(stool_sample_working_data, by = c('mda_code')) %>% 
+      # full_join(qpcr_results_working_data, by = c('mda_code')) %>% 
+      full_join(stool_receipt_qpcr_results_form11_merged, by=c('mda_code')) %>%
       mutate(mda_code_copy=mda_code) %>% 
       tidyr::separate(mda_code, into=c('province', 'book', 'page', 'line')) %>% 
       mutate(key=paste(f2_area_council_fct, f2_village_fct, province, book,page,f2_household_id, sep='_')) %>% 
