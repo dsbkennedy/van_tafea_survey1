@@ -1,7 +1,6 @@
-
-analysis_data <- readRDS("~/Library/CloudStorage/OneDrive-UNSW/analysis/van_tafea_survey1/analysis_data.Rds")
-
 library(tidyverse)
+library(targets)
+tar_load(analysis_data)
 
 area_council_prevalence <- analysis_data %>% 
   filter(f11_results_flag==1) %>% 
